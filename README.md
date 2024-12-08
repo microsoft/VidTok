@@ -1,5 +1,14 @@
-# VidTok
+<div align="center">
+
+# VidTok <br> <sub>A Family of Versatile and State-Of-The-Art Video Tokenizers</sub>
+
+[![arXiv](https://img.shields.io/badge/arXiv-Paper-red?logo=arxiv&logoColor=white)](https://arxiv.org/abs/) &ensp; [![GitHub](https://img.shields.io/badge/GitHub-Code-blue?logo=github&logoColor=white)](https://github.com/microsoft/VidTok) &ensp; [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/microsoft/VidTok)
+</div>
+
+---
+
 ![radar](assets/radar.png)
+
  We introduce VidTok, a family of versatile video tokenizers that delivers state-of-the-art performance in both continuous and discrete tokenizations. VidTok incorporates several key advancements over existing approaches:
  * ⚡️ **Model architecture**. We handle spatial and temporal sampling separately, reducing computational complexity without sacrificing reconstruction quality.
  * 🔥 **Advanced quantization techniques**. To address the training instability and codebook collapse commonly associated with conventional Vector Quantization (VQ), we use Finite Scalar Quantization (FSQ) in discrete video tokenization.
@@ -22,39 +31,39 @@ conda activate vidtok
 ```
 
 ## Checkpoints
-Download pre-trained models [here](), and put them in `checkpoints` folder, like:
+Download pre-trained models [here](https://huggingface.co/microsoft/VidTok/tree/main/checkpoints), and put them in `checkpoints` folder, like:
 ```
 └── checkpoints
-    ├── fsq_causal_41616_262144.ckpt
-    ├── fsq_causal_488_262144.ckpt
-    ├── fsq_causal_488_32768.ckpt
-    ├── fsq_causal_488_4096.ckpt
-    ├── fsq_noncausal_41616_262144.ckpt
-    ├── fsq_noncausal_488_262144.ckpt
-    ├── kl_causal_41616_4chn.ckpt
-    ├── kl_causal_488_16chn.ckpt
-    ├── kl_causal_488_8chn.ckpt
-    ├── kl_causal_488_4chn.ckpt
-    ├── kl_noncausal_41616_4chn.ckpt
-    └── kl_noncausal_488_4chn.ckpt
+    ├── vidtok_fsq_causal_41616_262144.ckpt
+    ├── vidtok_fsq_causal_488_262144.ckpt
+    ├── vidtok_fsq_causal_488_32768.ckpt
+    ├── vidtok_fsq_causal_488_4096.ckpt
+    ├── vidtok_fsq_noncausal_41616_262144.ckpt
+    ├── vidtok_fsq_noncausal_488_262144.ckpt
+    ├── vidtok_kl_causal_41616_4chn.ckpt
+    ├── vidtok_kl_causal_488_16chn.ckpt
+    ├── vidtok_kl_causal_488_8chn.ckpt
+    ├── vidtok_kl_causal_488_4chn.ckpt
+    ├── vidtok_kl_noncausal_41616_4chn.ckpt
+    └── vidtok_kl_noncausal_488_4chn.ckpt
 ```
 Each checkpoint has a corresponding config file with the same name in `configs` folder.
 | Model  | Regularizer | Causal  | VCR  | PSNR  | SSIM  | LPIPS  | FVD |
 |------|------|------|------|------|------|------|------|
-| [kl_causal_488_4chn.ckpt]()  | KL - 4chn  | ✔️   | 4x8x8  | 29.64 | 0.852| 0.114| 194.2|
-| [kl_causal_488_8chn.ckpt]()  |  KL - 8chn |  ✔️   |4x8x8  | 31.83 | 0.897| 0.083| 109.3|
-| [kl_causal_488_16chn.ckpt]()  | KL - 16chn  | ✔️  | 4x8x8   | 35.04 |0.942 |0.047 | 78.9| 
-| [kl_causal_41616_4chn.ckpt]()  | KL - 4chn  | ✔️  | 4x16x16   | 25.05  | 0.711| 0.228| 549.1| |
-| [kl_noncausal_488_4chn.ckpt]()  | KL - 4chn  |  ✖️ | 4x8x8   | 30.60  | 0.876 | 0.098| 157.9| 
-| [kl_noncausal_41616_4chn.ckpt]()  |  KL - 4chn | ✖️  | 4x16x16   | 26.06  | 0.751 | 0.190|423.2 |
-| [fsq_causal_488_262144.ckpt]()  | FSQ - 262,144  | ✔️  |  4x8x8  | 29.82  | 0.867 |0.106 | 160.1|
-| [fsq_causal_488_32768.ckpt]()  | FSQ - 32,768  | ✔️  | 4x8x8   | 29.16  | 0.854 | 0.117| 196.9|
-| [fsq_causal_488_4096.ckpt]()  | FSQ - 4096  | ✔️  | 4x8x8   | 28.36 | 0.832 | 0.133| 218.1|
-| [fsq_causal_41616_262144.ckpt]()  |  FSQ - 262,144 |  ✔️ |  4x16x16 | 25.38 | 0.738 |0.206 | 430.1|
-| [fsq_noncausal_488_262144.ckpt]()  |  FSQ - 262,144 | ✖️  | 4x8x8 | 30.78 | 0.889| 0.091| 132.1|
-| [fsq_noncausal_41616_262144.ckpt]()  |  FSQ - 262,144 | ✖️  |  4x16x16  | 26.37 | 0.772| 0.171| 357.0|
+| [vidtok_kl_causal_488_4chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_causal_488_4chn.ckpt)  | KL-4chn  | ✔️   | 4x8x8  | 29.64 | 0.852| 0.114| 194.2|
+| [vidtok_kl_causal_488_8chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_causal_488_8chn.ckpt)  |  KL-8chn |  ✔️   |4x8x8  | 31.83 | 0.897| 0.083| 109.3|
+| [vidtok_kl_causal_488_16chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_causal_488_16chn.ckpt)  | KL-16chn  | ✔️  | 4x8x8   | 35.04 |0.942 |0.047 | 78.9| 
+| [vidtok_kl_causal_41616_4chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_causal_41616_4chn.ckpt)  | KL-4chn  | ✔️  | 4x16x16   | 25.05  | 0.711| 0.228| 549.1| |
+| [vidtok_kl_noncausal_488_4chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_noncausal_488_4chn.ckpt)  | KL-4chn  |  ✖️ | 4x8x8   | 30.60  | 0.876 | 0.098| 157.9| 
+| [vidtok_kl_noncausal_41616_4chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_noncausal_41616_4chn.ckpt)  |  KL-4chn | ✖️  | 4x16x16   | 26.06  | 0.751 | 0.190|423.2 |
+| [vidtok_fsq_causal_488_262144](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_fsq_causal_488_262144.ckpt)  | FSQ-262,144  | ✔️  |  4x8x8  | 29.82  | 0.867 |0.106 | 160.1|
+| [vidtok_fsq_causal_488_32768](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_fsq_causal_488_32768.ckpt)  | FSQ-32,768  | ✔️  | 4x8x8   | 29.16  | 0.854 | 0.117| 196.9|
+| [vidtok_fsq_causal_488_4096](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_fsq_causal_488_4096.ckpt)  | FSQ-4096  | ✔️  | 4x8x8   | 28.36 | 0.832 | 0.133| 218.1|
+| [vidtok_fsq_causal_41616_262144](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_fsq_causal_41616_262144.ckpt)  |  FSQ-262,144 |  ✔️ |  4x16x16 | 25.38 | 0.738 |0.206 | 430.1|
+| [vidtok_fsq_noncausal_488_262144](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_fsq_noncausal_488_262144.ckpt)  |  FSQ-262,144 | ✖️  | 4x8x8 | 30.78 | 0.889| 0.091| 132.1|
+| [vidtok_fsq_noncausal_41616_262144](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_fsq_noncausal_41616_262144.ckpt)  |  FSQ-262,144 | ✖️  |  4x16x16  | 26.37 | 0.772| 0.171| 357.0|
 
-- `VCR` indicates the video compression ratio `TxHxW`
+- `VCR` indicates the video compression ratio `TxHxW`.
 - The above table shows model performance evaluated on 30 test videos in [MCL_JCL](https://mcl.usc.edu/mcl-jcv-dataset/) dataset, with a sample fps of 30. The input size is `17x256x256` for causal models and `16x256x256` for non-causal models.
 
 
@@ -127,7 +136,7 @@ subset2/subsubset1/videoname211.mp4
           fix_encoder: false
           fix_decoder: false
   ```
-  - Other hyperparameters according to your needs
+  - Other hyperparameters according to your needs.
 
 3. Run the following command to start training:
 ```bash
@@ -228,8 +237,8 @@ Just provide the path to the configuration file `cfg_path` and checkpoint file `
 import torch
 from scripts.inference_evaluate import load_model_from_config
 
-cfg_path = "configs/kl_causal_488_4chn.yaml"
-ckpt_path = "checkpoints/kl_causal_488_4chn.ckpt"
+cfg_path = "configs/vidtok_kl_causal_488_4chn.yaml"
+ckpt_path = "checkpoints/vidtok_kl_causal_488_4chn.ckpt"
 is_causal = True
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")    
@@ -263,7 +272,6 @@ python scripts/inference_evaluate.py --config CONFIG --ckpt CKPT --data_dir DATA
 (Optional) If you only want to test certain videos under `DATA_DIR`, you need to prepare a `.csv` meta file 
 to indicate the video files to be tested (refer to [Data Preparation](#data-preparation)). And add `--meta_path META_PATH` to the above command to specify the path to the `.csv` meta file.
 
-
 ## Intended Uses
 
 We are sharing our model with the research community to foster further research in this area: 
@@ -292,6 +300,16 @@ This codebase borrows code from [generative-models](https://github.com/Stability
 
 Thank you to everyone who contributed their wisdom and efforts to this project.
 
+## BibTeX
+
+```bibtex
+@article{tang2024vidtok,
+  title={VidTok: A Versatile and Open-Source Video Tokenizer},
+  author={Tang, Anni and He, Tianyu and Guo, Junliang and Song, Li and Bian, Jiang},
+  year={2024},
+  journal={arXiv preprint arXiv:2412.xxxxx},
+}
+```
 
 ## Contact
 

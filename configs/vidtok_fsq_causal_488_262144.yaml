@@ -4,7 +4,7 @@ model:
   params:
     monitor: val/rec_loss
     mode: min
-    # ckpt_path: checkpoints/fsq_causal_488_4096.ckpt  # train from existing checkpoint
+    # ckpt_path: checkpoints/vidtok_fsq_causal_488_262144.ckpt  # train from existing checkpoint
     ignore_keys: []
     # ema_decay: 0.999
 
@@ -12,7 +12,7 @@ model:
       target: vidtok.modules.model_3dcausal.EncoderCausal3DPadding
       params:
         double_z: false
-        z_channels: 4
+        z_channels: 6
         in_channels: 3
         out_ch: 3
         ch: 128
@@ -33,7 +33,7 @@ model:
     regularizer_config:
       target: vidtok.modules.regularizers.FSQRegularizer
       params:
-        levels: [8, 8, 8, 8]  # codebook size: 8*8*8*8=4096
+        levels: [8, 8, 8, 8, 8, 8]  # codebook size: 8*8*8*8*8*8=262144
         entropy_loss_weight: 0.1
         entropy_loss_annealing_steps: 2000
         entropy_loss_annealing_factor: 3

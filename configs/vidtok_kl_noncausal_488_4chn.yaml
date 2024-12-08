@@ -4,19 +4,19 @@ model:
   params:
     monitor: val/rec_loss
     mode: min
-    # ckpt_path: checkpoints/fsq_noncausal_41616_262144.ckpt  # train from existing checkpoint
+    # ckpt_path: checkpoints/vidtok_kl_noncausal_488_4chn.ckpt  # train from existing checkpoint
     ignore_keys: []
     # ema_decay: 0.999
 
     encoder_config:
       target: vidtok.modules.model_3dnoncausal.Encoder3D
       params:
-        double_z: false
-        z_channels: 6
+        double_z: true
+        z_channels: 4
         in_channels: 3
         out_ch: 3
         ch: 128
-        ch_mult: [1, 2, 4, 4, 4]
+        ch_mult: [1, 2, 4, 4]
         num_res_blocks: 2
         dropout: 0.0
         use_checkpoint: true
@@ -29,13 +29,7 @@ model:
       params: ${model.params.encoder_config.params}
 
     regularizer_config:
-      target: vidtok.modules.regularizers.FSQRegularizer
-      params:
-        levels: [8, 8, 8, 8, 8, 8]  # codebook size: 8*8*8*8*8*8=262144
-        entropy_loss_weight: 0.1
-        entropy_loss_annealing_steps: 2000
-        entropy_loss_annealing_factor: 3
-        commitment_loss_weight: 0.25
+      target: vidtok.modules.regularizers.DiagonalGaussianRegularizer
 
     loss_config:
       target: vidtok.modules.losses.GeneralLPIPSWithDiscriminator

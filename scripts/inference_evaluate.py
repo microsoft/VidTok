@@ -98,13 +98,13 @@ def main():
     parser.add_argument(
         "--config",
         type=str,
-        default="configs/kl_causal_488_4chn.yaml",
+        default="configs/vidtok_kl_causal_488_4chn.yaml",
         help="path to config which constructs model",
     )
     parser.add_argument(
         "--ckpt",
         type=str,
-        default="checkpoints/kl_causal_488_4chn.ckpt",
+        default="checkpoints/vidtok_kl_causal_488_4chn.ckpt",
         help="path to checkpoint of model",
     )
     parser.add_argument(

@@ -4,7 +4,7 @@ model:
   params:
     monitor: val/rec_loss
     mode: min
-    # ckpt_path: checkpoints/fsq_noncausal_488_262144.ckpt  # train from existing checkpoint
+    # ckpt_path: checkpoints/vidtok_fsq_noncausal_488_262144.ckpt  # train from existing checkpoint
     ignore_keys: []
     # ema_decay: 0.999
 
