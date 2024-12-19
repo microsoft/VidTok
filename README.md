@@ -2,7 +2,7 @@
 
 # VidTok <br> <sub>A Family of Versatile and State-Of-The-Art Video Tokenizers</sub>
 
-[![arXiv](https://img.shields.io/badge/arXiv-Paper-red?logo=arxiv&logoColor=white)](https://arxiv.org/abs/) &ensp; [![GitHub](https://img.shields.io/badge/GitHub-Code-blue?logo=github&logoColor=white)](https://github.com/microsoft/VidTok) &ensp; [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/microsoft/VidTok)
+[![arXiv](https://img.shields.io/badge/arXiv-Paper-red?logo=arxiv&logoColor=white)](https://arxiv.org/pdf/2412.13061) &ensp; [![GitHub](https://img.shields.io/badge/GitHub-Code-blue?logo=github&logoColor=white)](https://github.com/microsoft/VidTok) &ensp; [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/microsoft/VidTok)
 </div>
 
 ---
@@ -305,9 +305,9 @@ Thank you to everyone who contributed their wisdom and efforts to this project.
 ```bibtex
 @article{tang2024vidtok,
   title={VidTok: A Versatile and Open-Source Video Tokenizer},
-  author={Tang, Anni and He, Tianyu and Guo, Junliang and Song, Li and Bian, Jiang},
+  author={Tang, Anni and He, Tianyu and Guo, Junliang and Cheng, Xinle and Song, Li and Bian, Jiang},
   year={2024},
-  journal={arXiv preprint arXiv:2412.xxxxx},
+  journal={arXiv preprint arXiv:2412.13061},
 }
 ```
 
