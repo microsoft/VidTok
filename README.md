@@ -9,12 +9,18 @@
 
 ![radar](assets/radar.png)
 
- We introduce VidTok, a family of versatile video tokenizers that delivers state-of-the-art performance in both continuous and discrete tokenizations. VidTok incorporates several key advancements over existing approaches:
- * ⚡️ **Model architecture**. We handle spatial and temporal sampling separately, reducing computational complexity without sacrificing reconstruction quality.
- * 🔥 **Advanced quantization techniques**. To address the training instability and codebook collapse commonly associated with conventional Vector Quantization (VQ), we use Finite Scalar Quantization (FSQ) in discrete video tokenization.
- * 💥 **Improved training strategies**. To improve training efficiency, we employ a two-stage training strategy: initially pre-training the full model on low-resolution videos, followed by fine-tuning only the decoder on high-resolution videos. Furthermore, we observe that utilizing training data with reduced frame rates effectively improves the model's ability to represent motion dynamics.
+ We introduce VidTok, a cutting-edge family of video tokenizers that excels in both continuous and discrete tokenizations. VidTok incorporates several key advancements over existing approaches:
+ * ⚡️ **Efficient Architecture**. Separate spatial and temporal sampling reduces computational complexity without sacrificing quality.
+ * 🔥 **Advanced Quantization**. Finite Scalar Quantization (FSQ) addresses training instability and codebook collapse in discrete tokenization.
+ * 💥 **Enhanced Training**. A two-stage strategy—pre-training on low-res videos and fine-tuning on high-res—boosts efficiency. Reduced frame rates improve motion dynamics representation.
 
-We train VidTok on a large-scale video dataset and evaluation reveal that VidTok outperforms previous models in both discrete and continuous tokenization, achieving superior results across all evaluated metrics, including PSNR, SSIM, LPIPS, and FVD.
+VidTok, trained on a large-scale video dataset, outperforms previous models across all metrics, including PSNR, SSIM, LPIPS, and FVD.
+
+https://github.com/user-attachments/assets/a3341037-130d-4a83-aba6-c3daeaf66932
+
+## News
+
+* December, 2024: 🚀 [VidTok](https://github.com/microsoft/vidtok) was released!
 
 ## Setup
 1. Clone this repository and navigate to VidTok folder:
