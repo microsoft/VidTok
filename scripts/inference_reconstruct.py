@@ -18,7 +18,7 @@ from torch import autocast
 from torchvision.io import write_video
 from tqdm import tqdm
 
-from scripts.inference_evaluate import print0, load_model_from_config, transforms, decord
+from scripts.inference_evaluate import print0, load_model_from_config, transforms, decord, OmegaConf
 
 
 class SingleVideoDataset(torch.utils.data.Dataset):
@@ -133,6 +133,11 @@ def main():
         help="sample fps",
     )
     parser.add_argument(
+        "--pad_gen_frames",
+        action="store_true",
+        help="Used only in causal mode. If True, pad frames generated in the last batch, else replicate the first frame instead",
+    )
+    parser.add_argument(
         "--concate_input",
         type=str2bool,
         const=True,
@@ -147,11 +152,18 @@ def main():
     print0(f"[bold red]\[scripts.inference_reconstruct][/bold red] Evaluating model {args.ckpt}")
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     precision_scope = autocast if args.precision == "autocast" else nullcontext
+    config = OmegaConf.load(args.config)
 
     os.makedirs(args.output_video_dir, exist_ok=True)
 
     model = load_model_from_config(args.config, args.ckpt)
     model.to(device).eval()
+
+    if config.model.params.encoder_config.target == "vidtok.modules.model_3dcausal.EncoderCausal3DPadding":
+        is_causal = True
+        time_downsample_factor = model.encoder.time_downsample_factor
+    else:
+        is_causal = False
 
     dataset = SingleVideoDataset(
         args.input_video_path, args.input_height, args.input_width, args.num_frames_per_batch, args.sample_fps
@@ -164,7 +176,18 @@ def main():
         tic = time.time()
         for i, input in tqdm(enumerate(dataloader)):
             input = input.to(device)
-            _, xrec, _ = model(input)
+
+            if is_causal and args.pad_gen_frames and i != 0:
+                input = torch.cat([last_gen_frames, input], dim=2)
+                _, xrec, _ = model(input)
+                input = input[:, :, (time_downsample_factor - 1):, :, :]
+            else:
+                _, xrec, _ = model(input)
+            
+            if is_causal and args.pad_gen_frames:
+                xrec = xrec.clamp(-1, 1)
+                last_gen_frames = xrec[:, :, (1 - time_downsample_factor):, :, :]
+                
             input = rearrange(input, "b c t h w -> (b t) c h w")
             inputs.append(input)
             xrec = rearrange(xrec, "b c t h w -> (b t) c h w")

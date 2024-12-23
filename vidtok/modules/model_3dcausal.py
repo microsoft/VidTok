@@ -728,7 +728,8 @@ class EncoderCausal3DPadding(EncoderCausal3D):
 
     def forward(self, x):
         video_len = x.shape[2]
-        x = pad_at_dim(x, (self.time_padding, 0), dim=2, pad_mode=self.init_pad_mode, value=0.0)
+        if video_len % self.time_downsample_factor != 0:
+            x = pad_at_dim(x, (self.time_padding, 0), dim=2, pad_mode=self.init_pad_mode, value=0.0)
         return super().forward(x)
 
 

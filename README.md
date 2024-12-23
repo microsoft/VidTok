@@ -266,6 +266,7 @@ python scripts/inference_reconstruct.py --config CONFIG --ckpt CKPT --input_vide
 - Specify `VIDEO_PATH` to the path of your test video. We provide an example video in `assets/example.mp4`. 
 - Set `NUM_FRAMES_PER_BATCH` to `17` for causal models and `16` for non-causal models.
 - The reconstructed video is saved in `OUTPUT_DIR`.
+- For causal models, you can choose to add `--pad_gen_frames` to the command line, which may improve the smoothness of the reconstructed video.
 
 ### Performance Evaluation
 We also provide a manuscript `scripts/inference_evaluate.py` to evaluate the video reconstruction performance in PSNR, SSIM and LPIPS.
