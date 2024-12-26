@@ -20,6 +20,7 @@ https://github.com/user-attachments/assets/a3341037-130d-4a83-aba6-c3daeaf66932
 
 ## News
 
+* December, 2024: 🚀 [VidTwin](https://github.com/microsoft/VidTok/tree/main/vidtwin) was released!
 * December, 2024: 🚀 [VidTok](https://github.com/microsoft/vidtok) was released!
 
 ## Setup

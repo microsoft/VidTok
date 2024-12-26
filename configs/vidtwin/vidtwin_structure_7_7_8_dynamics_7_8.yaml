@@ -1,0 +1,149 @@
+model:
+  base_learning_rate: 1.6e-4
+  target: vidtwin.models.vidtwin_ae.VidAutoEncoderQformerCompactSymVidVAE
+  params:
+    input_key: jpg
+    monitor: val/rec_loss
+    ckpt_path: PATH_TO_CHECKPOINT
+    ignore_keys: []
+    expect_ch: 8
+    cont_num_blocks: 1
+    downsample_motion: True
+    motion_num_blocks: 1
+    d_dim: 8
+
+    temporal_qformer_config:
+      target: vidtwin.modules.qformer.MyQformerInterface
+      params:
+        num_query_tokens: 16
+        query_hidden_size: 64
+        encoder_hidden_size: 768
+
+    encoder_config:
+      target: vidtwin.modules.st_transformer.STTEncoder
+      params:
+        in_channels: 3
+        input_size: [16, 224, 224]
+        patch_size: [1, 16, 16]
+        hidden_size: 768
+        depth: 16
+        num_heads: 12
+        temporal_casual: true
+
+    decoder_config:
+      target: vidtwin.modules.st_transformer.STTDecoder
+      params:
+        in_channels: 3
+        input_size: [16, 224, 224]
+        patch_size: [1, 16, 16]
+        hidden_size: 768
+        depth: 16
+        num_heads: 12
+        temporal_casual: true
+
+    loss_config:
+      target: vidtok.modules.losses.GeneralLPIPSWithDiscriminator
+      params:
+        perceptual_weight: 0.05
+        disc_start: 20001
+        disc_weight: 0.05
+        learn_logvar: True
+        dims: 3
+        disc_type: 2d
+        regularization_weights:
+          kl_loss: 0.001
+
+    regularizer_config:
+      target: vidtok.modules.regularizers.DiagonalGaussianRegularizer
+      params:
+        sample: True
+
+
+    lr_scheduler_config_d:
+      target: vidtok.models.vidtwin_ae.LambdaWarmUpCosineScheduler
+      params:
+        lr_min: 0
+        lr_max: 1.5e-05
+        lr_start: 1.0e-05
+        warmup_steps: 5000
+    lr_scheduler_config_g:
+      target: vidtok.models.vidtwin_ae.LambdaWarmUpCosineScheduler
+      params:
+        lr_min: 0
+        lr_max: 3.0e-05
+        lr_start: 0
+        warmup_steps: 5000
+    optimizer_config:
+      target: torch.optim.AdamW
+      params:
+        betas:
+        - 0
+        - 0.9
+        weight_decay: 0.0001
+    lr_scheduler_config:
+      target: inverse_sqrt
+      params:
+        num_warmup_steps: 2000
+        frequency: 1
+        
+data:
+  target: vidtok.data.datamodule.DataModuleFromConfig
+  params:
+    batch_size: 2
+    num_workers: 12
+
+    train:
+      target: vidtok.data.vidtok.VidTokDataset
+      params:
+        data_dir: DATA_DIR_1  # DATA_DIR for training data
+        meta_path: META_PATH_1  # path to the .csv meta file of training data
+        video_params:
+          input_height: 224
+          input_width: 224
+          sample_num_frames: 16
+          sample_fps: 8
+
+    validation:
+      target: vidtok.data.vidtok.VidTokDataset
+      params:
+        data_dir: DATA_DIR_2  # DATA_DIR for validation data
+        meta_path: META_PATH_2  # path to the .csv meta file of validation data
+        video_params: 
+          input_height: 224
+          input_width: 224
+          sample_num_frames: 16
+          sample_fps: 8
+        start_index: 0
+
+
+lightning:
+  strategy:
+    target: lightning.pytorch.strategies.DDPStrategy
+    params:
+      find_unused_parameters: True
+
+  modelcheckpoint:
+    params:
+      every_n_train_steps: 5000
+
+
+  callbacks:
+    image_logger:
+      target: vidtok.modules.logger.ImageLogger
+      params:
+        enable_autocast: false
+        batch_frequency: 2000
+        max_images: 5
+        frames_per_video: 3
+        rescale: false
+
+
+
+  trainer:
+    # precision: bf16-mixed  # 16-mixed
+    benchmark: True
+    devices: 4
+    num_sanity_val_steps: 10
+    val_check_interval: 5000
+    accumulate_grad_batches: 1
+    max_epochs: 10
