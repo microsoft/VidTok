@@ -129,13 +129,18 @@ lightning:
 
   callbacks:
     image_logger:
-      target: vidtok.modules.logger.ImageLogger
+      target: vidtok.modules.logger.ImageVideoLogger
       params:
+        disabled: false
+        rescale: true
         enable_autocast: false
-        batch_frequency: 2000
-        max_images: 5
-        frames_per_video: 3
-        rescale: false
+        batch_frequency: 5000
+        max_samples: 2
+        increase_log_steps: false
+        log_first_step: false
+        log_before_first_step: false
+        log_images_kwargs:
+          n_rows: 2
 
 
 
