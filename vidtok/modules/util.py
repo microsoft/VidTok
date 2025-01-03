@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
-
+from torch.optim.lr_scheduler import _LRScheduler, LambdaLR, StepLR
 
 def get_valid_dirs(dir1: str, dir2: str, dir3: Union[None, str] = None) -> Union[None, str]:
     if (dir1 is not None) and os.path.isdir(dir1):
@@ -322,3 +322,36 @@ def gaussian_filter(
 
     g /= g.sum()
     return g.unsqueeze(0)
+
+
+def instantiate_lrscheduler_from_config(optimizer, config, name='main-LR'):
+    """
+    Instantiate a learning rate scheduler from a config dict.
+    If use timm, must add the following codes to the LightningModule:
+
+    def lr_scheduler_step(self, scheduler, metric):
+        if 'timm.scheduler' in self.lr_scheduler_config.target:
+            scheduler.step(epoch=self.current_epoch)
+        else:
+            if metric is None:
+                scheduler.step()
+            else:
+                scheduler.step(metric)
+    """
+    assert 'target' in config, 'Expected key `target` to instantiate.'
+    if ('torch.optim' in config.target) or ('timm.scheduler' in config.target):
+        scheduler = get_obj_from_str(config["target"])(optimizer, **config.get("params", dict()))
+        lr_scheduler = {
+            'scheduler': scheduler,
+            'name': name
+            }
+    else:
+        scheduler_init = instantiate_from_config(config)
+        scheduler = LambdaLR(optimizer, lr_lambda=scheduler_init.schedule)
+        lr_scheduler = {
+            'scheduler': LambdaLR(optimizer, lr_lambda=scheduler_init.schedule),
+            'name': name,
+            'interval': 'step',
+            'frequency': 1
+            }
+    return scheduler
