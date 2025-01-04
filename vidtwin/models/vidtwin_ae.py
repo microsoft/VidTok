@@ -12,9 +12,9 @@ from omegaconf import ListConfig
 from packaging import version
 from safetensors.torch import load_file as load_safetensors
 
-
+from torch.optim.lr_scheduler import _LRScheduler, LambdaLR, StepLR
 from vidtok.modules.util import default, instantiate_from_config, print0, get_valid_paths
-from vidtok.modules.util import compute_psnr, compute_ssim, instantiate_lrscheduler_from_config
+from vidtok.modules.util import compute_psnr, compute_ssim
 from vidtok.models.autoencoder import AbstractAutoencoder
 import numpy as np
 from torch import nn
@@ -1565,6 +1565,40 @@ class LambdaWarmUpCosineScheduler(_LRScheduler):
                     1 + np.cos(t * np.pi))  # a + 0.5 * (b - a) * (1 + cos(pi * t)), where t \in [0, 1], so the lr will be in [a, b]
             self.last_lr = lr
             return [lr]
+
+
+
+def instantiate_lrscheduler_from_config(optimizer, config, name='main-LR'):
+    """
+    Instantiate a learning rate scheduler from a config dict.
+    If use timm, must add the following codes to the LightningModule:
+
+    def lr_scheduler_step(self, scheduler, metric):
+        if 'timm.scheduler' in self.lr_scheduler_config.target:
+            scheduler.step(epoch=self.current_epoch)
+        else:
+            if metric is None:
+                scheduler.step()
+            else:
+                scheduler.step(metric)
+    """
+    assert 'target' in config, 'Expected key `target` to instantiate.'
+    if ('torch.optim' in config.target) or ('timm.scheduler' in config.target):
+        scheduler = get_obj_from_str(config["target"])(optimizer, **config.get("params", dict()))
+        lr_scheduler = {
+            'scheduler': scheduler,
+            'name': name
+            }
+    else:
+        scheduler_init = instantiate_from_config(config)
+        scheduler = LambdaLR(optimizer, lr_lambda=scheduler_init.schedule)
+        lr_scheduler = {
+            'scheduler': LambdaLR(optimizer, lr_lambda=scheduler_init.schedule),
+            'name': name,
+            'interval': 'step',
+            'frequency': 1
+            }
+    return scheduler
 
 
 
