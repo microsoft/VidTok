@@ -552,6 +552,8 @@ class EncoderCausal3D(nn.Module):
         ch,
         out_ch,
         ch_mult=(1, 2, 4, 8),
+        spatial_ds=None,
+        tempo_ds=None,
         num_res_blocks,
         dropout=0.0,
         resamp_with_conv=True,
@@ -579,9 +581,9 @@ class EncoderCausal3D(nn.Module):
 
         in_ch_mult = (1,) + tuple(ch_mult)
         self.in_ch_mult = in_ch_mult
+        self.spatial_ds = list(range(0, self.num_resolutions - 1)) if spatial_ds is None else spatial_ds
+        self.tempo_ds = [self.num_resolutions - 2, self.num_resolutions - 3] if tempo_ds is None else tempo_ds
         self.down = nn.ModuleList()
-
-        self.tempo_ds = [self.num_resolutions - 2, self.num_resolutions - 3]
         self.down_temporal = nn.ModuleList()
         for i_level in range(self.num_resolutions):
             block_in = ch * in_ch_mult[i_level]
@@ -624,7 +626,7 @@ class EncoderCausal3D(nn.Module):
             down_temporal.block = block_temporal
             down_temporal.attn = attn_temporal
 
-            if i_level != self.num_resolutions - 1:
+            if i_level in self.spatial_ds:
                 down.downsample = Downsample(block_in, resamp_with_conv)
                 if i_level in self.tempo_ds:
                     down_temporal.downsample = TimeDownsampleResCausal2x(block_in, block_in)
@@ -684,7 +686,7 @@ class EncoderCausal3D(nn.Module):
                 )
                 hs.append(h)
 
-            if i_level != self.num_resolutions - 1:
+            if i_level in self.spatial_ds:
                 # spatial downsample
                 htmp = einops.rearrange(hs[-1], "b c t h w -> (b t) c h w")
                 htmp = self.down[i_level].downsample(htmp)
@@ -740,6 +742,8 @@ class DecoderCausal3D(nn.Module):
         ch,
         out_ch,
         ch_mult=(1, 2, 4, 8),
+        spatial_us=None,
+        tempo_us=None,
         num_res_blocks,
         dropout=0.0,
         resamp_with_conv=True,
@@ -795,8 +799,9 @@ class DecoderCausal3D(nn.Module):
         ) 
 
         # upsampling
+        self.spatial_us = list(range(1, self.num_resolutions)) if spatial_us is None else spatial_us
+        self.tempo_us = [1, 2] if tempo_us is None else tempo_us
         self.up = nn.ModuleList()
-        self.tempo_us = [1, 2]
         for i_level in reversed(range(self.num_resolutions)):
             block = nn.ModuleList()
             attn = nn.ModuleList()
@@ -817,7 +822,7 @@ class DecoderCausal3D(nn.Module):
             up = nn.Module()
             up.block = block
             up.attn = attn
-            if i_level != 0:
+            if i_level in self.spatial_us:
                 up.upsample = Upsample(block_in, resamp_with_conv)
             self.up.insert(0, up)
 
@@ -882,7 +887,7 @@ class DecoderCausal3D(nn.Module):
                     h, self.up[i_level].block[i_block], self.up_temporal[i_level].block[i_block], temb
                 )
 
-            if i_level != 0:
+            if i_level in self.spatial_us:
                 # spatial upsample
                 h = einops.rearrange(h, "b c t h w -> (b t) c h w")
                 h = self.up[i_level].upsample(h)
