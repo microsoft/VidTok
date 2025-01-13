@@ -112,14 +112,7 @@ class AttnBlock(nn.Module):
         return rearrange(h_, "b 1 (h w) c -> b c h w", h=h, w=w, c=c, b=b)
 
     def forward(self, x, **kwargs):
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=UserWarning)
-            if x.grad is not None or x.grad_fn is not None:
-                use_checkpoint = True
-            else:
-                use_checkpoint = False
-
-        if use_checkpoint:
+        if self.use_checkpoint:
             return checkpoint(self._forward, (x,), self.parameters(), self.use_checkpoint)
         else:
             return self._forward(x)
@@ -333,14 +326,7 @@ class ResnetBlock(nn.Module):
         self.use_checkpoint = use_checkpoint
 
     def forward(self, x, temb):
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=UserWarning)
-            if x.grad is not None or x.grad_fn is not None:
-                use_checkpoint = True
-            else:
-                use_checkpoint = False
-
-        if use_checkpoint:
+        if self.use_checkpoint:
             assert temb is None, "checkpointing not supported with temb"
             return checkpoint(self._forward, (x,), self.parameters(), self.use_checkpoint)
         else:
@@ -423,14 +409,7 @@ class ResnetCausalBlock(nn.Module):
         self.use_checkpoint = use_checkpoint
 
     def forward(self, x, temb):
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=UserWarning)
-            if x.grad is not None or x.grad_fn is not None:
-                use_checkpoint = True
-            else:
-                use_checkpoint = False
-
-        if use_checkpoint:
+        if self.use_checkpoint:
             assert temb is None, "checkpointing not supported with temb"
             return checkpoint(self._forward, (x,), self.parameters(), self.use_checkpoint)
         else:
@@ -503,14 +482,7 @@ class ResnetCausalBlock1D(nn.Module):
         self.use_checkpoint = use_checkpoint
 
     def forward(self, x, temb):
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=UserWarning)
-            if x.grad is not None or x.grad_fn is not None:
-                use_checkpoint = True
-            else:
-                use_checkpoint = False
-
-        if use_checkpoint:
+        if self.use_checkpoint:
             assert temb is None, "checkpointing not supported with temb"
             return checkpoint(self._forward, (x,), self.parameters(), self.use_checkpoint)
         else:

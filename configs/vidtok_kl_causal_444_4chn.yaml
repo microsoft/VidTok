@@ -22,7 +22,7 @@ model:
         time_downsample_factor: 4
         num_res_blocks: 2
         dropout: 0.0
-        use_checkpoint: true
+        use_checkpoint: false
         init_pad_mode: replicate
         norm_type: layernorm  # layernorm, groupnorm
         fix_encoder: false  # if True, fix it without updating params
