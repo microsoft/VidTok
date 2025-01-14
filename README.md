@@ -25,7 +25,7 @@ https://github.com/user-attachments/assets/a3341037-130d-4a83-aba6-c3daeaf66932
 
 ## Setup
 1. Clone this repository and navigate to VidTok folder:
-```
+```bash
 git clone https://github.com/microsoft/VidTok
 cd VidTok
 ```
@@ -35,6 +35,17 @@ cd VidTok
 conda env create -f environment.yaml
 # 2. Activate the environment
 conda activate vidtok
+```
+
+We recommend using 1+ high-end GPU for training and inference. We have done all testing and development using A100 and MI300X GPUs. For convenience, we also provide prebuilt [Docker](https://hub.docker.com/) images with required dependencies. You can use it as follows:
+
+```bash
+# NVIDIA GPUs
+docker run -it --gpus all --shm-size 256G --rm -v `pwd`:/workspace --workdir /workspace \
+    deeptimhe/ubuntu22.04-cuda12.1-python3.10-pytorch2.5:orig-vidtok bash
+# AMD GPUs
+docker run -it --gpus all --shm-size 256G --rm -v `pwd`:/workspace --workdir /workspace \
+    deeptimhe/ubuntu22.04-rocm6.2.4-python3.10-pytorch2.5:orig-vidtok bash
 ```
 
 ## Checkpoints
@@ -154,7 +165,7 @@ python main.py -b CONFIG --logdir LOGDIR
 Training logs and checkpoints are saved in `LOGDIR`. 
 
 It is recommended to use [Weights & Biases](https://wandb.ai/site) as the data visualization tool ([TensorBoard](https://www.tensorflow.org/tensorboard) by default). Use `wandb login` to log in first, and then run:
-```
+```bash
 python main.py -b CONFIG --logdir LOGDIR --wandb --wandb_entity ENTITY --wandb_project PROJECT
 ```
 
@@ -261,7 +272,7 @@ assert x_input.shape == x_recon.shape
 ```
 
 ### Reconstruct an Input Video
-```
+```bash
 python scripts/inference_reconstruct.py --config CONFIG --ckpt CKPT --input_video_path VIDEO_PATH --num_frames_per_batch NUM_FRAMES_PER_BATCH --input_height 256 --input_width 256 --sample_fps 30 --output_video_dir OUTPUT_DIR
 ```
 - Specify `VIDEO_PATH` to the path of your test video. We provide an example video in `assets/example.mp4`. 
@@ -274,7 +285,7 @@ We also provide a manuscript `scripts/inference_evaluate.py` to evaluate the vid
 
 1. Put all of your test videos under `DATA_DIR`.
 2. Run the following command, and all `.mp4` videos under `DATA_DIR` will be tested:
-```
+```bash
 python scripts/inference_evaluate.py --config CONFIG --ckpt CKPT --data_dir DATA_DIR --num_frames_per_batch NUM_FRAMES_PER_BATCH --input_height 256 --input_width 256 --sample_fps 30
 ```
 (Optional) If you only want to test certain videos under `DATA_DIR`, you need to prepare a `.csv` meta file 

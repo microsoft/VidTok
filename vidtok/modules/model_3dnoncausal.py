@@ -1,20 +1,12 @@
-import functools
-import math
-import time
-import warnings
-from typing import Any, Callable, Optional
+from typing import Callable
 
 import einops
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from beartype import beartype
-from beartype.typing import List, Optional, Tuple, Union
 from einops import rearrange
-from packaging import version
 
-from .model_3dcausal import spatial_temporal_resblk, nonlinearity, Normalize, AttnBlock
+from .model_3dcausal import (AttnBlock, Normalize, nonlinearity,
+                             spatial_temporal_resblk)
 from .util import checkpoint
 
 

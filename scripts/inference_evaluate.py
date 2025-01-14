@@ -7,51 +7,28 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import time
-import numpy as np
-import torch
 from contextlib import nullcontext
-from pathlib import Path
-
-import decord
-from einops import rearrange
-from lightning.pytorch import seed_everything
 from omegaconf import OmegaConf
-from safetensors.torch import load_file as load_safetensors
 from torch import autocast
-from torchvision import transforms
 from tqdm import tqdm
 
-from vidtok.modules.lpips import LPIPS
+import numpy as np
+import torch
+from einops import rearrange
+from lightning.pytorch import seed_everything
+
 from vidtok.data.vidtok import VidTokValDataset
-from vidtok.modules.util import instantiate_from_config, print0, compute_psnr, compute_ssim
+from vidtok.modules.lpips import LPIPS
+from vidtok.modules.util import (compute_psnr, compute_ssim,
+                                 instantiate_from_config, print0)
 
 
-def load_model_from_config(config, ckpt, verbose=False):
+def load_model_from_config(config, ckpt, ignore_keys=[], verbose=False):
     config = OmegaConf.load(config)
-    print0(f"[bold red]\[scripts.inference_evaluate][/bold red] Loading model from {ckpt}")
+    config.model.params.ckpt_path = ckpt
+    config.model.params.ignore_keys = ignore_keys
+    config.model.params.verbose = verbose
     model = instantiate_from_config(config.model)
-
-    if ckpt.endswith("ckpt"):
-        sd = torch.load(ckpt, map_location="cpu")["state_dict"]
-    elif ckpt.endswith("safetensors"):
-        sd = load_safetensors(ckpt)
-    else:
-        raise NotImplementedError(f"Unknown checkpoint: {ckpt}")
-
-    new_sd = {}
-    for k, v in sd.items():
-        if k.startswith("loss"):
-            continue
-        new_sd[k] = v
-    missing, unexpected = model.load_state_dict(new_sd, strict=False)
-    print0(
-        f"[bold red]\[scripts.inference_evaluate][/bold red] Restored from {ckpt} with {len(missing)} missing and {len(unexpected)} unexpected keys"
-    )
-
-    if len(missing) > 0:
-        print0(f"[bold red]\[scripts.inference_evaluate][/bold red] Missing Keys: {missing}")
-    if len(unexpected) > 0:
-        print0(f"[bold red]\[scripts.inference_evaluate][/bold red] Unexpected Keys: {unexpected}")
     return model
 
 
@@ -116,7 +93,7 @@ def main():
     parser.add_argument(
         "--data_dir",
         type=str,
-        default="",
+        default="./",
         help="root folder",
     )
     parser.add_argument(

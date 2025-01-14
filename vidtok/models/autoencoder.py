@@ -1,17 +1,17 @@
-import os
 import re
 from abc import abstractmethod
 from contextlib import contextmanager
 from typing import Any, Dict, Tuple, Union
+from omegaconf import ListConfig
+from packaging import version
 
 import torch
 import lightning.pytorch as pl
-from omegaconf import ListConfig
-from packaging import version
-from safetensors.torch import load_file as load_safetensors
 
-from vidtok.modules.util import default, get_obj_from_str, instantiate_from_config, print0
+from safetensors.torch import load_file as load_safetensors
 from vidtok.modules.ema import LitEma
+from vidtok.modules.util import (default, get_obj_from_str,
+                                 instantiate_from_config, print0)
 
 
 class AbstractAutoencoder(pl.LightningModule):
@@ -25,8 +25,6 @@ class AbstractAutoencoder(pl.LightningModule):
         monitor: Union[None, str] = None,
         mode: Union[None, str] = None,
         input_key: str = "jpg",
-        ckpt_path: Union[None, str] = None,
-        ignore_keys: Union[Tuple, list, ListConfig] = (),
     ):
         super().__init__()
 
@@ -38,45 +36,12 @@ class AbstractAutoencoder(pl.LightningModule):
         if mode is not None:
             self.mode = mode
 
-        print0(
-            f"[bold magenta]\[vidtok.models.autoencoder][AbstractAutoencoder][/bold magenta] Use ckpt_path: {ckpt_path}"
-        )
-        if ckpt_path is not None:
-            self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
-
         if version.parse(torch.__version__) >= version.parse("2.0.0"):
             self.automatic_optimization = False
 
-    def init_from_ckpt(self, path: str, ignore_keys: Union[Tuple, list, ListConfig] = tuple()) -> None:
-        if path.endswith("ckpt"):
-            sd = torch.load(path, map_location="cpu")["state_dict"]
-        elif path.endswith("safetensors"):
-            sd = load_safetensors(path)
-        else:
-            raise NotImplementedError
-
-        keys = list(sd.keys())
-        for k in keys:
-            for ik in ignore_keys:
-                if re.match(ik, k):
-                    print0(
-                        "[bold magenta]\[vidtok.models.autoencoder][AbstractAutoencoder][/bold magenta] Deleting key {} from state_dict.".format(
-                            k
-                        )
-                    )
-                    del sd[k]
-        missing, unexpected = self.load_state_dict(sd, strict=False)
-        print0(
-            f"[bold magenta]\[vidtok.models.autoencoder][AbstractAutoencoder][/bold magenta] Restored from {path} with {len(missing)} missing and {len(unexpected)} unexpected keys"
-        )
-        if len(missing) > 0:
-            print0(
-                f"[bold magenta]\[vidtok.models.autoencoder][AbstractAutoencoder][/bold magenta] Missing Keys: {missing}"
-            )
-        if len(unexpected) > 0:
-            print0(
-                f"[bold magenta]\[vidtok.models.autoencoder][AbstractAutoencoder][/bold magenta] Unexpected Keys: {unexpected}"
-            )
+    @abstractmethod
+    def init_from_ckpt(self, path: str, ignore_keys: Union[Tuple, list, ListConfig] = tuple(), verbose: bool = True) -> None:
+        raise NotImplementedError()
 
     @abstractmethod
     def get_input(self, batch) -> Any:
@@ -124,6 +89,7 @@ class AbstractAutoencoder(pl.LightningModule):
         )
         return get_obj_from_str(cfg["target"])(params, lr=lr, **cfg.get("params", dict()))
 
+    @abstractmethod
     def configure_optimizers(self) -> Any:
         raise NotImplementedError()
 
@@ -147,6 +113,7 @@ class AutoencodingEngine(AbstractAutoencoder):
     ):
         ckpt_path = kwargs.pop("ckpt_path", None)
         ignore_keys = kwargs.pop("ignore_keys", ())
+        verbose = kwargs.pop("verbose", True)
         super().__init__(*args, **kwargs)
 
         compile = (
@@ -162,51 +129,49 @@ class AutoencodingEngine(AbstractAutoencoder):
         self.optimizer_config = default(optimizer_config, {"target": "torch.optim.Adam"})
         self.lr_g_factor = lr_g_factor
 
-        print0(
-            f"[bold magenta]\[vidtok.models.autoencoder][AutoencodingEngine][/bold magenta] Use ckpt_path: {ckpt_path}"
-        )
-        if ckpt_path is not None:
-            self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
-
         if self.use_ema:
             self.model_ema = LitEma(self, decay=self.ema_decay)
             print0(
                 f"[bold magenta]\[vidtok.models.autoencoder][AutoencodingEngine][/bold magenta] Keeping EMAs of {len(list(self.model_ema.buffers()))}."
             )
+        
+        print0(
+            f"[bold magenta]\[vidtok.models.autoencoder][AutoencodingEngine][/bold magenta] Use ckpt_path: {ckpt_path}"
+        )
+        if ckpt_path is not None:
+            self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys, verbose=verbose)
 
-    def init_from_ckpt(self, path, ignore_keys: Union[Tuple, list, ListConfig] = tuple()) -> None:
+    def init_from_ckpt(self, path: str, ignore_keys: Union[Tuple, list, ListConfig] = tuple(), verbose: bool = True) -> None:
         if path.endswith("ckpt"):
             ckpt = torch.load(path, map_location="cpu")
-            if "state_dict" in ckpt:
-                sd = ckpt["state_dict"]
-            else:
-                sd = ckpt
+            weights = ckpt["state_dict"] if "state_dict" in ckpt else ckpt
         elif path.endswith("safetensors"):
-            sd = load_safetensors(path)
+            weights = load_safetensors(path)
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f"Unknown checkpoint: {path}")
 
-        keys = list(sd.keys())
+        keys = list(weights.keys())
         for k in keys:
             for ik in ignore_keys:
                 if re.match(ik, k):
                     print0(
                         f"[bold magenta]\[vidtok.models.autoencoder][AutoencodingEngine][/bold magenta] Deleting key {k} from state_dict."
                     )
-                    del sd[k]
+                    del weights[k]
 
-        missing, unexpected = self.load_state_dict(sd, strict=False)
+        missing, unexpected = self.load_state_dict(weights, strict=False)
         print0(
             f"[bold magenta]\[vidtok.models.autoencoder][AutoencodingEngine][/bold magenta] Restored from {path} with {len(missing)} missing and {len(unexpected)} unexpected keys"
         )
-        if len(missing) > 0:
-            print0(
-                f"[bold magenta]\[vidtok.models.autoencoder][AutoencodingEngine][/bold magenta] Missing Keys: {missing}"
-            )
-        if len(unexpected) > 0:
-            print0(
-                f"[bold magenta]\[vidtok.models.autoencoder][AutoencodingEngine][/bold magenta] Unexpected Keys: {unexpected}"
-            )
+        if verbose:
+            if len(missing) > 0:
+                print0(
+                    f"[bold magenta]\[vidtok.models.autoencoder][AutoencodingEngine][/bold magenta] Missing Keys: {missing}"
+                )
+            if len(unexpected) > 0:
+                print0(
+                    f"[bold magenta]\[vidtok.models.autoencoder][AutoencodingEngine][/bold magenta] Unexpected Keys: {unexpected}"
+                )
 
     def get_input(self, batch: Dict) -> torch.Tensor:
         return batch[self.input_key]

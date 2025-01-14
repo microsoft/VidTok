@@ -1,20 +1,14 @@
-import functools
-import math
-import time
-import warnings
-from typing import Any, Callable, Optional
+from typing import Callable
+from beartype import beartype
+from beartype.typing import Tuple, Union
 
 import einops
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from beartype import beartype
-from beartype.typing import List, Optional, Tuple, Union
 from einops import rearrange
-from packaging import version
 
-from .util import checkpoint, print0
+from .util import checkpoint
 
 
 def spatial_temporal_resblk(x, block_s, block_t, temb):
@@ -127,10 +121,10 @@ class AttnBlock(nn.Module):
 class AttnBlockWrapper(AttnBlock):
     def __init__(self, in_channels, use_checkpoint=False, norm_type="groupnorm"):
         super().__init__(in_channels, use_checkpoint=use_checkpoint, norm_type=norm_type)
-        self.q = CausalConv3d(in_channels, in_channels, kernel_size=1, stride=1, padding=0)
-        self.k = CausalConv3d(in_channels, in_channels, kernel_size=1, stride=1, padding=0)
-        self.v = CausalConv3d(in_channels, in_channels, kernel_size=1, stride=1, padding=0)
-        self.proj_out = CausalConv3d(in_channels, in_channels, kernel_size=1, stride=1, padding=0)
+        self.q = CausalConv3d(in_channels, in_channels, kernel_size=1, stride=1)
+        self.k = CausalConv3d(in_channels, in_channels, kernel_size=1, stride=1)
+        self.v = CausalConv3d(in_channels, in_channels, kernel_size=1, stride=1)
+        self.proj_out = CausalConv3d(in_channels, in_channels, kernel_size=1, stride=1)
 
     def attention(self, h_: torch.Tensor) -> torch.Tensor:
         B = h_.shape[0]
@@ -153,12 +147,6 @@ class CausalConv1d(nn.Module):
         super().__init__()
         dilation = kwargs.pop("dilation", 1)
         stride = kwargs.pop("stride", 1)
-        if "padding" in kwargs:
-            print0(
-                "[bold cyan]\[vidtok.modules.model_3dcausal][CausalConv1d][/bold cyan] padding is deprecated, use auto causal padding instead"
-            )
-            ignore_padding = kwargs.pop("padding", 0)
-
         self.pad_mode = pad_mode
         self.time_pad = dilation * (kernel_size - 1) + (1 - stride)
         self.time_causal_padding = (self.time_pad, 0)
@@ -178,12 +166,6 @@ class CausalConv3d(nn.Module):
         kernel_size = cast_tuple(kernel_size, 3)
         dilation = kwargs.pop("dilation", 1)
         stride = kwargs.pop("stride", 1)
-        if "padding" in kwargs:
-            print0(
-                "[bold cyan]\[vidtok.modules.model_3dcausal][CausalConv3d][/bold cyan] padding is deprecated, use auto causal padding instead"
-            )
-            ignore_padding = kwargs.pop("padding", 0)
-
         dilation = cast_tuple(dilation, 3)
         stride = cast_tuple(stride, 3)
 
@@ -258,7 +240,7 @@ class TimeDownsampleResCausal2x(nn.Module):
         super().__init__()
         self.kernel_size = (3, 3, 3)
         self.avg_pool = nn.AvgPool3d((3, 1, 1), stride=(2, 1, 1))
-        self.conv = CausalConv3d(in_channels, out_channels, 3, stride=(2, 1, 1), padding=0)
+        self.conv = CausalConv3d(in_channels, out_channels, 3, stride=(2, 1, 1))
         # https://github.com/PKU-YuanGroup/Open-Sora-Plan/blob/main/opensora/models/causalvideovae/model/modules/updownsample.py
         self.mix_factor = torch.nn.Parameter(torch.Tensor([mix_factor]))
 
@@ -278,7 +260,7 @@ class TimeUpsampleResCausal2x(nn.Module):
         mix_factor: float = 2.0,
     ):
         super().__init__()
-        self.conv = CausalConv3d(in_channels, out_channels, 3, padding=0)
+        self.conv = CausalConv3d(in_channels, out_channels, 3)
         # https://github.com/PKU-YuanGroup/Open-Sora-Plan/blob/main/opensora/models/causalvideovae/model/modules/updownsample.py
         self.mix_factor = torch.nn.Parameter(torch.Tensor([mix_factor]))
 
@@ -463,17 +445,17 @@ class ResnetCausalBlock1D(nn.Module):
         self.norm_type = norm_type
 
         self.norm1 = Normalize(in_channels, norm_type=self.norm_type)
-        self.conv1 = CausalConv1d(in_channels, out_channels, kernel_size=3, stride=1, padding=0)
+        self.conv1 = CausalConv1d(in_channels, out_channels, kernel_size=3, stride=1)
         if temb_channels > 0:
             self.temb_proj = torch.nn.Linear(temb_channels, out_channels)
         self.norm2 = Normalize(out_channels, norm_type=self.norm_type)
         self.dropout = torch.nn.Dropout(dropout)
-        self.conv2 = CausalConv1d(out_channels, out_channels, kernel_size=3, stride=1, padding=0)
+        self.conv2 = CausalConv1d(out_channels, out_channels, kernel_size=3, stride=1)
         if self.in_channels != self.out_channels:
             if self.use_conv_shortcut:
-                self.conv_shortcut = CausalConv1d(in_channels, out_channels, kernel_size=3, stride=1, padding=0)
+                self.conv_shortcut = CausalConv1d(in_channels, out_channels, kernel_size=3, stride=1)
             else:
-                self.nin_shortcut = CausalConv1d(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
+                self.nin_shortcut = CausalConv1d(in_channels, out_channels, kernel_size=1, stride=1)
 
         if zero_init:
             self.conv2.conv.weight.data.zero_()
@@ -549,7 +531,7 @@ class EncoderCausal3D(nn.Module):
         make_attn_cls = self._make_attn()
         make_resblock_cls = self._make_resblock()
 
-        self.conv_in = make_conv_cls(in_channels, self.ch, kernel_size=3, stride=1, padding=1)
+        self.conv_in = make_conv_cls(in_channels, self.ch, kernel_size=3, stride=1)
 
         in_ch_mult = (1,) + tuple(ch_mult)
         self.in_ch_mult = in_ch_mult
@@ -634,7 +616,6 @@ class EncoderCausal3D(nn.Module):
             2 * z_channels if double_z else z_channels,
             kernel_size=3,
             stride=1,
-            padding=1,
         )
 
     def _make_attn(self) -> Callable:
@@ -746,7 +727,7 @@ class DecoderCausal3D(nn.Module):
         make_resblock_cls = self._make_resblock()
         make_conv_cls = self._make_conv()
 
-        self.conv_in = make_conv_cls(z_channels, block_in, kernel_size=3, stride=1, padding=1)
+        self.conv_in = make_conv_cls(z_channels, block_in, kernel_size=3, stride=1)
 
         # middle
         self.mid = nn.Module()
@@ -826,7 +807,7 @@ class DecoderCausal3D(nn.Module):
 
         # end
         self.norm_out = Normalize(block_in, norm_type=self.norm_type)
-        self.conv_out = make_conv_cls(block_in, out_ch, kernel_size=3, stride=1, padding=1)
+        self.conv_out = make_conv_cls(block_in, out_ch, kernel_size=3, stride=1)
 
     def _make_attn(self) -> Callable:
         return make_attn

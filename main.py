@@ -31,7 +31,8 @@ from lightning.pytorch.callbacks import Callback
 from lightning.pytorch.loggers import WandbLogger
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
 
-from vidtok.modules.util import exists, instantiate_from_config, isheatmap, print0, seed_anything
+from vidtok.modules.util import (exists, instantiate_from_config, isheatmap,
+                                 print0, seed_anything)
 
 MULTINODE_HACKS = True
 

@@ -7,18 +7,22 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import time
-import numpy as np
 from contextlib import nullcontext
+from omegaconf import OmegaConf
 from pathlib import Path
+from tqdm import tqdm
 
+import numpy as np
 import torch
+import decord
 from einops import rearrange
 from lightning.pytorch import seed_everything
 from torch import autocast
+from torchvision import transforms
 from torchvision.io import write_video
-from tqdm import tqdm
 
-from scripts.inference_evaluate import print0, load_model_from_config, transforms, decord, OmegaConf
+from vidtok.modules.util import print0
+from scripts.inference_evaluate import load_model_from_config
 
 
 class SingleVideoDataset(torch.utils.data.Dataset):

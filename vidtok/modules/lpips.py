@@ -1,13 +1,14 @@
 import hashlib
 import os
 from collections import namedtuple
+from tqdm import tqdm
 
 import requests
 import torch
 import torch.nn as nn
-from .util import print0
 from torchvision import models
-from tqdm import tqdm
+
+from .util import print0
 
 URL_MAP = {"vgg_lpips": "https://heibox.uni-heidelberg.de/f/607503859c864bc1b30b/?dl=1"}
 
@@ -39,7 +40,7 @@ def get_ckpt_path(name, root, check=False):
     path = os.path.join(root, CKPT_MAP[name])
     if os.path.exists(path) and not (check and not md5_hash(path) == MD5_MAP[name]):
         print0(
-            "[bold cyan]\[vidtok.modules.lpips][get_ckpt_path][/bold cyan] Using existing path for {} model: {}".format(
+            "[bold cyan]\[vidtok.modules.lpips]\[get_ckpt_path][/bold cyan] Using existing path for {} model: {}".format(
                 name, path
             )
         )
@@ -47,7 +48,7 @@ def get_ckpt_path(name, root, check=False):
 
     # if not, download the model
     print0(
-        "[bold cyan]\[vidtok.modules.lpips][get_ckpt_path][/bold cyan] Downloading {} model from {} to {}".format(
+        "[bold cyan]\[vidtok.modules.lpips]\[get_ckpt_path][/bold cyan] Downloading {} model from {} to {}".format(
             name, URL_MAP[name], path
         )
     )

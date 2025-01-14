@@ -4,10 +4,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
-from .util import default, instantiate_from_config, print0
 
-from .discriminator import NLayerDiscriminator, NLayerDiscriminator3D, weights_init
+from .discriminator import (NLayerDiscriminator, NLayerDiscriminator3D,
+                            weights_init)
 from .lpips import LPIPS
+from .util import default, print0
 
 
 def hinge_d_loss(logits_real, logits_fake):
