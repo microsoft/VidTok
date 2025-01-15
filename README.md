@@ -267,9 +267,50 @@ model.to(device).eval()
 num_frames = 17 if is_causal else 16
 x_input = (torch.rand(1, 3, num_frames, 256, 256) * 2 - 1).to(device)  # [B, C, T, H, W], range -1~1
 # model forward
-_, x_recon, _ = model(x_input)
+with torch.no_grad():
+  _, x_recon, _ = model(x_input)
 assert x_input.shape == x_recon.shape
 ```
+
+### Use Torch Compile to Speed Up Inference
+Use compiled components in VidTok can speed up inference by as much as 2X. The following code snippet demonstrates how to compile our models.
+```python
+import torch
+from scripts.inference_evaluate import load_model_from_config
+
+torch._inductor.config.cpp.weight_prepack=True
+torch._inductor.config.freezing=True
+
+cfg_path = "configs/vidtok_kl_causal_488_4chn.yaml"
+ckpt_path = "checkpoints/vidtok_kl_causal_488_4chn.ckpt"
+is_causal = True
+
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")    
+# load pre-trained model
+model = load_model_from_config(cfg_path, ckpt_path)
+model.to(device).eval()
+# random input
+num_frames = 17 if is_causal else 16
+x_input = (torch.rand(1, 3, num_frames, 256, 256) * 2 - 1).to(device)  # [B, C, T, H, W], range -1~1
+
+model.encoder =  torch.compile(model.encoder)
+model.decoder = torch.compile(model.decoder)
+
+# Warm Up
+with torch.no_grad():
+    _, x_recon, _ = model(x_input)
+
+torch.cuda.synchronize()
+import time
+start = time.time()
+with torch.no_grad():
+    for i in range(10):
+        _, x_recon, _ = model(x_input) 
+torch.cuda.synchronize()
+print(f"Average inference time: {(time.time() - start)/10 :.4f} seconds")
+```
+
+
 
 ### Reconstruct an Input Video
 ```bash
