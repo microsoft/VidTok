@@ -267,7 +267,7 @@ model.to(device).eval()
 num_frames = 17 if is_causal else 16
 x_input = (torch.rand(1, 3, num_frames, 256, 256) * 2 - 1).to(device)  # [B, C, T, H, W], range -1~1
 # model forward
-with torch.no_grad(), torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+with torch.no_grad(), torch.autocast(device_type='cuda', dtype=torch.float16):
     _, x_recon, _ = model(x_input)
 assert x_input.shape == x_recon.shape
 ```
@@ -298,13 +298,13 @@ model.encoder =  torch.compile(model.encoder)
 model.decoder = torch.compile(model.decoder)
 
 # Warm Up
-with torch.no_grad(), torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+with torch.no_grad(), torch.autocast(device_type='cuda', dtype=torch.float16):
     _, x_recon, _ = model(x_input)
 
 torch.cuda.synchronize()
 import time
 start = time.time()
-with torch.no_grad(), torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+with torch.no_grad(), torch.autocast(device_type='cuda', dtype=torch.float16):
     for i in range(10):
         _, x_recon, _ = model(x_input) 
 torch.cuda.synchronize()
