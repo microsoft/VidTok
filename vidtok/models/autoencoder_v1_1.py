@@ -115,7 +115,8 @@ class AutoencodingEngine(AbstractAutoencoder):
         ckpt_path = kwargs.pop("ckpt_path", None)
         ignore_keys = kwargs.pop("ignore_keys", ())
         verbose = kwargs.pop("verbose", True)
-        self.is_causal = kwargs.pop("is_causal", True)
+        self.use_tiling = kwargs.pop("use_tiling", False)
+        self.t_chunk_enc = kwargs.pop("t_chunk_enc", 16)
         super().__init__(*args, **kwargs)
 
         compile = (
@@ -131,12 +132,16 @@ class AutoencodingEngine(AbstractAutoencoder):
         self.optimizer_config = default(optimizer_config, {"target": "torch.optim.Adam"})
         self.lr_g_factor = lr_g_factor
 
+        self.t_chunk_dec = self.t_chunk_enc // self.encoder.time_downsample_factor
+        self.use_overlap = False
+        self.is_causal = True
+
         if self.use_ema:
             self.model_ema = LitEma(self, decay=self.ema_decay)
             print0(
                 f"[bold magenta]\[vidtok.models.autoencoder][AutoencodingEngine][/bold magenta] Keeping EMAs of {len(list(self.model_ema.buffers()))}."
             )
-        
+
         print0(
             f"[bold magenta]\[vidtok.models.autoencoder][AutoencodingEngine][/bold magenta] Use ckpt_path: {ckpt_path}"
         )
@@ -194,14 +199,70 @@ class AutoencodingEngine(AbstractAutoencoder):
     def get_last_layer(self):
         return self.decoder.get_last_layer()
 
+    def _empty_causal_cached(self, parent):
+        for name, module in parent.named_modules():
+            if hasattr(module, 'causal_cache'):
+                module.causal_cache = None
+
+    def _set_first_chunk(self, is_first_chunk=True):
+        for module in self.modules():
+            if hasattr(module, 'is_first_chunk'):
+                module.is_first_chunk = is_first_chunk
+
+    def _set_cache_offset(self, modules, cache_offset=0):
+        for module in modules:
+            for submodule in module.modules():
+                if hasattr(submodule, 'cache_offset'):
+                    submodule.cache_offset = cache_offset
+
+    def build_chunk_start_end(self, t, decoder_mode=False):
+        start_end = [[0, 1]]
+        start = 1
+        end = start
+        while True:
+            if start >= t:
+                break
+            end = min(t, end + (self.t_chunk_dec if decoder_mode else self.t_chunk_enc))
+            start_end.append([start, end])
+            start = end
+        return start_end
+
     def encode(self, x: Any, return_reg_log: bool = False) -> Any:
-        z = self.encoder(x)
-        z, reg_log = self.regularization(z, n_steps=self.global_step // 2)
+        self._empty_causal_cached(self.encoder)
+        self._set_first_chunk(True)
+
+        if self.use_tiling:
+            z, reg_log = self.tile_encode(x)
+        else:
+            z = self.encoder(x)
+            z, reg_log = self.regularization(z, n_steps=self.global_step // 2)
 
         if return_reg_log:
             return z, reg_log
         return z
-    
+
+    def tile_encode(self, x: Any) -> Any:
+        num_frames = x.shape[2]
+        start_end = self.build_chunk_start_end(num_frames)
+        result_z, result_log = [], []
+
+        for idx, (start, end) in enumerate(start_end):
+            self._set_first_chunk(idx == 0)
+            chunk = x[:, :, start:end, :, :]
+            chunk_z = self.encoder(chunk)
+            chunk_z, chunk_reg_log = self.regularization(chunk_z, n_steps=self.global_step//2)
+            result_z.append(chunk_z)
+            result_log.append(chunk_reg_log)
+        try:
+            kl_losses = [d['kl_loss'] for d in result_log]
+            mean_kl_loss = torch.mean(torch.stack(kl_losses))
+            return torch.cat(result_z, dim=2), {'kl_loss': mean_kl_loss}
+        except:
+            entropy_aux_losses = [d['aux_loss'] for d in result_log]
+            mean_entropy_aux_loss = torch.mean(torch.stack(entropy_aux_losses))
+            indices = [d['indices'] for d in result_log]
+            return torch.cat(result_z, dim=2), {'aux_loss': mean_entropy_aux_loss, 'indices': torch.cat(indices, dim=1)}
+
     def indices_to_latent(self, token_indices: torch.Tensor) -> torch.Tensor:
         token_indices = rearrange(token_indices, "... -> ... 1")
         token_indices, ps = pack_one(token_indices, "b * d")
@@ -212,11 +273,54 @@ class AutoencodingEngine(AbstractAutoencoder):
         z = rearrange(z, "b ... d -> b d ...")
         return z
 
+    def tile_indices_to_latent(self, token_indices: torch.Tensor) -> torch.Tensor:
+        num_frames = token_indices.shape[1]
+        start_end = self.build_chunk_start_end(num_frames, decoder_mode=True)
+        result_z = []
+        for (start, end) in start_end:
+            chunk = token_indices[:, start:end, :, :]
+            chunk_z = self.indices_to_latent(chunk)
+            result_z.append(chunk_z.clone())
+        return torch.cat(result_z, dim=2)
+
     def decode(self, z: Any, decode_from_indices: bool = False) -> torch.Tensor:
         if decode_from_indices:
-            z = self.indices_to_latent(z)
-        x = self.decoder(z)
+            if self.use_tiling:
+                z = self.tile_indices_to_latent(z)
+            else:
+                z = self.indices_to_latent(z)
+
+        self._empty_causal_cached(self.decoder)
+        self._set_first_chunk(True)
+
+        if self.use_tiling:
+            x = self.tile_decode(z)
+        else:
+            x = self.decoder(z)
         return x
+
+    def tile_decode(self, z: Any) -> torch.Tensor:
+        num_frames = z.shape[2]
+        start_end = self.build_chunk_start_end(num_frames, decoder_mode=True)
+        result = []
+
+        if self.use_overlap:
+            assert self.encoder.time_downsample_factor == 4, "Only support 4x temporal downsampling now."
+            self._set_cache_offset([self.decoder], 1)
+            self._set_cache_offset([self.decoder.up_temporal[1], self.decoder.up_temporal[2].upsample], 2)
+            self._set_cache_offset([self.decoder.up_temporal[0], self.decoder.up_temporal[1].upsample, self.decoder.conv_out], 4)
+            # TODO: support more settings
+
+        for idx, (start, end) in enumerate(start_end):
+            self._set_first_chunk(idx == 0)
+            chunk_z = z[:, :, start:end+1, :, :] if self.use_overlap and end + 1 <= num_frames else z[:, :, start:end, :, :]
+            chunk = self.decoder(chunk_z)
+
+            if self.use_overlap and end + 1 <= num_frames:
+                chunk = chunk[:, :, :-self.encoder.time_downsample_factor]
+            result.append(chunk.clone())
+
+        return torch.cat(result, dim=2)
 
     def forward(self, x: Any) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         if self.encoder.fix_encoder:
@@ -224,8 +328,9 @@ class AutoencodingEngine(AbstractAutoencoder):
                 z, reg_log = self.encode(x, return_reg_log=True)
         else:
             z, reg_log = self.encode(x, return_reg_log=True)
-
         dec = self.decode(z)
+        if dec.shape[2] != x.shape[2]:
+            dec = dec[:, :, -x.shape[2]:, ...]
         return z, dec, reg_log
 
     def training_step(self, batch, batch_idx) -> Any:

@@ -18,12 +18,63 @@ VidTok, trained on a large-scale video dataset, outperforms previous models acro
 
 https://github.com/user-attachments/assets/a3341037-130d-4a83-aba6-c3daeaf66932
 
-## News
-
+## 🔥 News
+* March, 2025: 🚀 [VidTok v1.1](#-updates-in-vidtok-v11) was released! We fine-tuned all causal models on long videos to support tokenization and reconstruction of videos of arbitrary length with fine temporal smoothness. [Relevant checkpoints](https://huggingface.co/microsoft/VidTok/tree/main/checkpoints/vidtok_v1_1) are continuously updating.
 * December, 2024: 🚀 [VidTwin](https://github.com/microsoft/VidTok/tree/main/vidtwin) was released!
 * December, 2024: 🚀 [VidTok](https://github.com/microsoft/vidtok) was released!
 
-## Setup
+
+## 💥 Updates in VidTok v1.1
+> VidTok v1.1 is an update for causal models. We fine-tuned all causal models on long videos to support tokenization and reconstruction of videos of arbitrary length with fine temporal smoothness. See performance [here](#v11-performance).
+
+### v1.1: Long Video Reconstruction
+Run the following inference script to [reconstruct an input video](#reconstruct-an-input-video):
+```bash
+python scripts/inference_reconstruct.py --config CONFIG_v1_1 --ckpt CKPT_v1_1 --input_video_path VIDEO_PATH --input_height 256 --input_width 256 --sample_fps 30 --chunk_size CHUNK_SIZE --output_video_dir OUTPUT_DIR --read_long_video
+# Set `CHUNK_SIZE` according to your GPU memory, recommendly 16.
+```
+and run the following inference script to [evaluate the reconstruction performance](#performance-evaluation):
+```bash
+python scripts/inference_evaluate.py --config CONFIG_v1_1 --ckpt CKPT_v1_1 --data_dir DATA_DIR --input_height 256 --input_width 256 --sample_fps 30 --chunk_size CHUNK_SIZE --read_long_video
+# Set `CHUNK_SIZE` according to your GPU memory, recommendly 16.
+```
+
+For an easy usage of VidTok v1.1 models, refer to [this script](#easy-usage) and make the following revision:
+```python
+# Use VidTok v1.1 models
+cfg_path = "configs/vidtok_v1_1/vidtok_kl_causal_488_4chn_v1_1.yaml"
+ckpt_path = "checkpoints/vidtok_v1_1/vidtok_kl_causal_488_4chn_v1_1.ckpt"
+
+...
+
+model.to('cuda').eval()
+# Using tiling inference to save memory usage
+model.use_tiling = True
+model.t_chunk_enc = 16
+model.t_chunk_dec = model.t_chunk_enc // model.encoder.time_downsample_factor
+model.use_overlap = True
+# random input: long video
+x_input = (torch.rand(1, 3, 129, 256, 256) * 2 - 1).to('cuda') 
+
+...
+
+if x_recon.shape[2] != x_input.shape[2]:
+    x_recon = x_recon[:, :, -x_input.shape[2]:, ...]
+```
+
+### v1.1: Long Video Fine-tuning
+Follow this [training guidance](#fine-tune-on-custom-data) to fine-tune on your custom long video data and note that:
+- Compared to VidTok v1.0, we tend to use longer sequences to fine-tune the model (for example, setting `NUM_FRAMES_1` to 33, 49, or larger). 
+- The resolution and the sequence length of training data should be adjusted according to GPU memory.
+
+### v1.1: Performance 
+| Model  | Regularizer | Causal | VCR  | PSNR  | SSIM  | LPIPS  | FVD |
+|------|------|------|------|------|------|------|------|
+| [vidtok_kl_causal_488_16chn_v1_1](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_v1_1/vidtok_kl_causal_488_16chn_v1_1.ckpt) | KL-16chn | ✔️ | 4x8x8 | 35.13 | 0.941 | 0.049 | 87.4 | 
+- This is the evaluation result of long video reconstruction conducted on each complete video in [MCL_JCL](https://mcl.usc.edu/mcl-jcv-dataset/) dataset, with a sample fps of 30 and a resolution of `256x256`.
+
+
+## 🔧 Setup
 1. Clone this repository and navigate to VidTok folder:
 ```bash
 git clone https://github.com/microsoft/VidTok
@@ -48,32 +99,47 @@ docker run -it --gpus all --shm-size 256G --rm -v `pwd`:/workspace --workdir /wo
     deeptimhe/ubuntu22.04-rocm6.2.4-python3.10-pytorch2.5:orig-vidtok bash
 ```
 
-## Checkpoints
+## 🎈 Checkpoints
 Download pre-trained models [here](https://huggingface.co/microsoft/VidTok/tree/main/checkpoints), and put them in `checkpoints` folder, like:
 ```
 └── checkpoints
+    ├── vidtok_v1_1
+    │   ├── vidtok_kl_causal_488_16chn_v1_1.ckpt
+    │   └── ...
     ├── vidtok_fsq_causal_41616_262144.ckpt
     ├── vidtok_fsq_causal_488_262144.ckpt
     ├── vidtok_fsq_causal_488_32768.ckpt
     ├── vidtok_fsq_causal_488_4096.ckpt
     ├── vidtok_fsq_noncausal_41616_262144.ckpt
     ├── vidtok_fsq_noncausal_488_262144.ckpt
+    ├── vidtok_kl_causal_288_8chn.ckpt
     ├── vidtok_kl_causal_41616_4chn.ckpt
+    ├── vidtok_kl_causal_444_4chn.ckpt
     ├── vidtok_kl_causal_488_16chn.ckpt
-    ├── vidtok_kl_causal_488_8chn.ckpt
     ├── vidtok_kl_causal_488_4chn.ckpt
+    ├── vidtok_kl_causal_488_8chn.ckpt
+    ├── vidtok_kl_noncausal_41616_16chn.ckpt
     ├── vidtok_kl_noncausal_41616_4chn.ckpt
+    ├── vidtok_kl_noncausal_488_16chn.ckpt
     └── vidtok_kl_noncausal_488_4chn.ckpt
 ```
 Each checkpoint has a corresponding config file with the same name in `configs` folder.
+
+
+## 🔆 Performance
+
 | Model  | Regularizer | Causal  | VCR  | PSNR  | SSIM  | LPIPS  | FVD |
 |------|------|------|------|------|------|------|------|
 | [vidtok_kl_causal_488_4chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_causal_488_4chn.ckpt)  | KL-4chn  | ✔️   | 4x8x8  | 29.64 | 0.852| 0.114| 194.2|
 | [vidtok_kl_causal_488_8chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_causal_488_8chn.ckpt)  |  KL-8chn |  ✔️   |4x8x8  | 31.83 | 0.897| 0.083| 109.3|
 | [vidtok_kl_causal_488_16chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_causal_488_16chn.ckpt)  | KL-16chn  | ✔️  | 4x8x8   | 35.04 |0.942 |0.047 | 78.9| 
-| [vidtok_kl_causal_41616_4chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_causal_41616_4chn.ckpt)  | KL-4chn  | ✔️  | 4x16x16   | 25.05  | 0.711| 0.228| 549.1| |
+| [vidtok_kl_causal_288_8chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_causal_288_8chn.ckpt)  | KL-8chn  | ✔️  | 2x8x8   | 33.86 | 0.928 |0.057 | 80.7 | 
+| [vidtok_kl_causal_444_4chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_causal_444_4chn.ckpt)  | KL-4chn  | ✔️  | 4x4x4   | 34.78 | 0.941 | 0.051| 87.2| 
+| [vidtok_kl_causal_41616_4chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_causal_41616_4chn.ckpt)  | KL-4chn  | ✔️  | 4x16x16   | 25.05  | 0.711| 0.228| 549.1|
 | [vidtok_kl_noncausal_488_4chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_noncausal_488_4chn.ckpt)  | KL-4chn  |  ✖️ | 4x8x8   | 30.60  | 0.876 | 0.098| 157.9| 
+| [vidtok_kl_noncausal_488_16chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_noncausal_488_16chn.ckpt)  | KL-16chn  |  ✖️ | 4x8x8   | 36.13  | 0.950 | 0.044| 60.5| 
 | [vidtok_kl_noncausal_41616_4chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_noncausal_41616_4chn.ckpt)  |  KL-4chn | ✖️  | 4x16x16   | 26.06  | 0.751 | 0.190|423.2 |
+| [vidtok_kl_noncausal_41616_16chn](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_kl_noncausal_41616_16chn.ckpt)  |  KL-16chn | ✖️  | 4x16x16   | 30.69 | 0.878 | 0.095| 147.1|
 | [vidtok_fsq_causal_488_262144](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_fsq_causal_488_262144.ckpt)  | FSQ-262,144  | ✔️  |  4x8x8  | 29.82  | 0.867 |0.106 | 160.1|
 | [vidtok_fsq_causal_488_32768](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_fsq_causal_488_32768.ckpt)  | FSQ-32,768  | ✔️  | 4x8x8   | 29.16  | 0.854 | 0.117| 196.9|
 | [vidtok_fsq_causal_488_4096](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_fsq_causal_488_4096.ckpt)  | FSQ-4096  | ✔️  | 4x8x8   | 28.36 | 0.832 | 0.133| 218.1|
@@ -84,8 +150,7 @@ Each checkpoint has a corresponding config file with the same name in `configs` 
 - `VCR` indicates the video compression ratio `TxHxW`.
 - The above table shows model performance evaluated on 30 test videos in [MCL_JCL](https://mcl.usc.edu/mcl-jcv-dataset/) dataset, with a sample fps of 30. The input size is `17x256x256` for causal models and `16x256x256` for non-causal models.
 
-
-## Training
+## 🔛 Training
 
 ### Data Preparation
 1. Put all training videos under `DATA_DIR`:
@@ -246,30 +311,36 @@ Then revise other hyperparameters according to your needs, and run the training 
 </details>
 
 
-## Inference
+## 🚀 Inference
 
 ### Easy Usage
 We provide the following example for a quick usage of our models. It works for both continuous and discrete tokenization and both causal and non-causal models. 
-Just provide the path to the configuration file `cfg_path` and checkpoint file `ckpt_path`, and set `is_causal` to `True` or `False` accordingly.
+Just provide the path to the configuration file `cfg_path` and checkpoint file `ckpt_path`.
 ```python
 import torch
 from scripts.inference_evaluate import load_model_from_config
 
 cfg_path = "configs/vidtok_kl_causal_488_4chn.yaml"
 ckpt_path = "checkpoints/vidtok_kl_causal_488_4chn.ckpt"
-is_causal = True
 
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")    
 # load pre-trained model
 model = load_model_from_config(cfg_path, ckpt_path)
-model.to(device).eval()
+model.to('cuda').eval()
 # random input
-num_frames = 17 if is_causal else 16
-x_input = (torch.rand(1, 3, num_frames, 256, 256) * 2 - 1).to(device)  # [B, C, T, H, W], range -1~1
+num_frames = 17 if model.is_causal else 16
+x_input = (torch.rand(1, 3, num_frames, 256, 256) * 2 - 1).to('cuda')  # [B,C,T,H,W], range -1~1
 # model forward
 with torch.no_grad(), torch.autocast(device_type='cuda', dtype=torch.float16):
     _, x_recon, _ = model(x_input)
 assert x_input.shape == x_recon.shape
+```
+If you want to directly infer from latent tokens, run the following code:
+```python
+z, reg_log = model.encode(x_input, return_reg_log=True)
+# infer from continuous latent space
+x_recon = model.decode(z)
+# infer from discrete latent tokens
+x_recon = model.decode(reg_log['indices'], decode_from_indices=True)
 ```
 
 ### Use Torch Compile to Speed Up Inference
@@ -284,18 +355,16 @@ torch._inductor.config.freezing=True
 
 cfg_path = "configs/vidtok_kl_causal_488_4chn.yaml"
 ckpt_path = "checkpoints/vidtok_kl_causal_488_4chn.ckpt"
-is_causal = True
 
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")    
 # load pre-trained model
 model = load_model_from_config(cfg_path, ckpt_path)
-model.to(device).eval()
-# random input
-num_frames = 17 if is_causal else 16
-x_input = (torch.rand(1, 3, num_frames, 256, 256) * 2 - 1).to(device)  # [B, C, T, H, W], range -1~1
-
-model.encoder =  torch.compile(model.encoder)
+model.to('cuda').eval()
+model.encoder = torch.compile(model.encoder)
 model.decoder = torch.compile(model.decoder)
+
+# random input
+num_frames = 17 if model.is_causal else 16
+x_input = (torch.rand(1, 3, num_frames, 256, 256) * 2 - 1).to('cuda')  # [B,C,T,H,W], range -1~1
 
 # Warm Up
 with torch.no_grad(), torch.autocast(device_type='cuda', dtype=torch.float16):
@@ -311,13 +380,11 @@ torch.cuda.synchronize()
 print(f"Average inference time: {(time.time() - start)/10 :.4f} seconds")
 ```
 
-
 ### Reconstruct an Input Video
 ```bash
-python scripts/inference_reconstruct.py --config CONFIG --ckpt CKPT --input_video_path VIDEO_PATH --num_frames_per_batch NUM_FRAMES_PER_BATCH --input_height 256 --input_width 256 --sample_fps 30 --output_video_dir OUTPUT_DIR
+python scripts/inference_reconstruct.py --config CONFIG --ckpt CKPT --input_video_path VIDEO_PATH --input_height 256 --input_width 256 --sample_fps 30 --output_video_dir OUTPUT_DIR
 ```
 - Specify `VIDEO_PATH` to the path of your test video. We provide an example video in `assets/example.mp4`. 
-- Set `NUM_FRAMES_PER_BATCH` to `17` for causal models and `16` for non-causal models.
 - The reconstructed video is saved in `OUTPUT_DIR`.
 - For causal models, you can choose to add `--pad_gen_frames` to the command line, which may improve the smoothness of the reconstructed video.
 
@@ -327,26 +394,26 @@ We also provide a manuscript `scripts/inference_evaluate.py` to evaluate the vid
 1. Put all of your test videos under `DATA_DIR`.
 2. Run the following command, and all `.mp4` videos under `DATA_DIR` will be tested:
 ```bash
-python scripts/inference_evaluate.py --config CONFIG --ckpt CKPT --data_dir DATA_DIR --num_frames_per_batch NUM_FRAMES_PER_BATCH --input_height 256 --input_width 256 --sample_fps 30
+python scripts/inference_evaluate.py --config CONFIG --ckpt CKPT --data_dir DATA_DIR --input_height 256 --input_width 256 --sample_fps 30
 ```
 (Optional) If you only want to test certain videos under `DATA_DIR`, you need to prepare a `.csv` meta file 
 to indicate the video files to be tested (refer to [Data Preparation](#data-preparation)). And add `--meta_path META_PATH` to the above command to specify the path to the `.csv` meta file.
 
-## Intended Uses
+## 💡 Intended Uses
 
 We are sharing our model with the research community to foster further research in this area: 
 * Training your own video tokenizers for research purpose.
 * Video tokenization with various compression rates.
 
 
-## Out-of-scope Uses
+## 🪧 Out-of-scope Uses
 
 Our models are not specifically designed or evaluated for all downstream purposes. Developers should consider common limitations of video tokenizers (e.g., performance degradation on out-of-domain data) as they select use cases, and evaluate and mitigate for privacy, safety, and fairness before using within a specific downstream use case, particularly for high-risk scenarios. 
 
 Developers should be aware of and adhere to applicable laws or regulations (including privacy, trade compliance laws, etc.) that are relevant to their use case. 
 
 
-## Risks and Limitations 
+## 🤖️ Risks and Limitations 
 
 Some of the limitations of this model to be aware of include:
 * VidTok may lose detailed information on the reconstructed content.
@@ -354,13 +421,13 @@ Some of the limitations of this model to be aware of include:
 * VidTok was developed for research and experimental purposes. Further testing and validation are needed before considering its application in commercial or real-world scenarios.
 
 
-## Acknowledgments
+## 🤗 Acknowledgments
 
 This codebase borrows code from [generative-models](https://github.com/Stability-AI/generative-models). We thank Stability AI for its efforts and innovations, which have made the development process more efficient and convenient.
 
 Thank you to everyone who contributed their wisdom and efforts to this project.
 
-## BibTeX
+## ✏️ BibTeX
 
 ```bibtex
 @article{tang2024vidtok,
@@ -371,11 +438,11 @@ Thank you to everyone who contributed their wisdom and efforts to this project.
 }
 ```
 
-## Contact
+## ☎️ Contact
 
 We welcome feedback and collaboration from our audience. If you have suggestions, questions, or observe unexpected/offensive behavior in our technology, please contact us at tianyuhe@microsoft.com.
 
-## Contributing
+## 📄 Contributing
 
 This project welcomes contributions and suggestions.  Most contributions require you to agree to a
 Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
@@ -390,7 +457,7 @@ For more information see the [Code of Conduct FAQ](https://opensource.microsoft.
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
 
-## Trademarks
+## 📍 Trademarks
 
 This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft 
 trademarks or logos is subject to and must follow 

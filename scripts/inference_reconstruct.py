@@ -26,15 +26,23 @@ from scripts.inference_evaluate import load_model_from_config
 
 
 class SingleVideoDataset(torch.utils.data.Dataset):
-    def __init__(self, video_path, input_height=128, input_width=128, num_frames_per_batch=16, sample_fps=8):
+    def __init__(
+        self, 
+        video_path, 
+        input_height=128, 
+        input_width=128, 
+        sample_fps=8,
+        chunk_size=16,
+        is_causal=True,
+        read_long_video=False
+    ):
         decord.bridge.set_bridge("torch")
         self.video_path = video_path
-        normalize = transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
         self.transform = transforms.Compose(
             [
                 transforms.Resize(input_height, antialias=True),
                 transforms.CenterCrop((input_height, input_width)),
-                normalize,
+                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
             ]
         )
 
@@ -45,9 +53,17 @@ class SingleVideoDataset(torch.utils.data.Dataset):
         interval = round(fps / sample_fps)
         frame_ids = list(range(0, total_frames, interval))
         self.frame_ids_batch = []
-        for x in range(0, len(frame_ids), num_frames_per_batch):
-            if len(frame_ids[x : x + num_frames_per_batch]) == num_frames_per_batch:
-                self.frame_ids_batch.append(frame_ids[x : x + num_frames_per_batch])
+        if read_long_video:
+            video_length = len(frame_ids)
+            if is_causal and video_length > chunk_size:
+                self.frame_ids_batch.append(frame_ids[:chunk_size * ((video_length - 1) // chunk_size) + 1])
+            elif not is_causal and video_length >= chunk_size:
+                self.frame_ids_batch.append(frame_ids[:chunk_size * (video_length // chunk_size)])
+        else:
+            num_frames_per_batch = chunk_size + 1 if is_causal else chunk_size
+            for x in range(0, len(frame_ids), num_frames_per_batch):
+                if len(frame_ids[x : x + num_frames_per_batch]) == num_frames_per_batch:
+                    self.frame_ids_batch.append(frame_ids[x : x + num_frames_per_batch])
 
     def __len__(self):
         return len(self.frame_ids_batch)
@@ -125,16 +141,20 @@ def main():
         help="width of the input video",
     )
     parser.add_argument(
-        "--num_frames_per_batch",
-        type=int,
-        default=17,
-        help="number of frames per batch",
-    )
-    parser.add_argument(
         "--sample_fps",
         type=int,
         default=30,
         help="sample fps",
+    )
+    parser.add_argument(
+        "--chunk_size",
+        type=int,
+        default=16,
+        help="the size of a chunk - we split a long video into several chunks",
+    )
+    parser.add_argument(
+        "--read_long_video",
+        action='store_true'
     )
     parser.add_argument(
         "--pad_gen_frames",
@@ -162,15 +182,24 @@ def main():
 
     model = load_model_from_config(args.config, args.ckpt)
     model.to(device).eval()
+    assert args.chunk_size % model.encoder.time_downsample_factor == 0
 
-    if config.model.params.encoder_config.target == "vidtok.modules.model_3dcausal.EncoderCausal3DPadding":
-        is_causal = True
-        time_downsample_factor = model.encoder.time_downsample_factor
-    else:
-        is_causal = False
-
+    if args.read_long_video:
+        assert hasattr(model, 'use_tiling'), "Tiling inference is needed to conduct long video reconstruction."
+        print(f"Using tiling inference to save memory usage...")
+        model.use_tiling = True
+        model.t_chunk_enc = args.chunk_size
+        model.t_chunk_dec = model.t_chunk_enc // model.encoder.time_downsample_factor
+        model.use_overlap = True
+        
     dataset = SingleVideoDataset(
-        args.input_video_path, args.input_height, args.input_width, args.num_frames_per_batch, args.sample_fps
+        video_path=args.input_video_path, 
+        input_height=args.input_height, 
+        input_width=args.input_width, 
+        sample_fps=args.sample_fps,
+        chunk_size=args.chunk_size, 
+        is_causal=model.is_causal,
+        read_long_video=args.read_long_video
     )
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
 
@@ -180,21 +209,20 @@ def main():
         tic = time.time()
         for i, input in tqdm(enumerate(dataloader)):
             input = input.to(device)
-
-            if is_causal and args.pad_gen_frames and i != 0:
-                input = torch.cat([last_gen_frames, input], dim=2)
-                _, xrec, _ = model(input)
-                input = input[:, :, (time_downsample_factor - 1):, :, :]
+            
+            if model.is_causal and not args.read_long_video and args.pad_gen_frames:
+                if i == 0:
+                    _, xrec, _ = model(input)
+                else:
+                    _, xrec, _ = model(torch.cat([last_gen_frames, input], dim=2))
+                xrec = xrec[:, :, -input.shape[2]:].clamp(-1, 1)
+                last_gen_frames = xrec[:, :, (1 - model.encoder.time_downsample_factor):, :, :]
             else:
                 _, xrec, _ = model(input)
-            
-            if is_causal and args.pad_gen_frames:
-                xrec = xrec.clamp(-1, 1)
-                last_gen_frames = xrec[:, :, (1 - time_downsample_factor):, :, :]
                 
             input = rearrange(input, "b c t h w -> (b t) c h w")
             inputs.append(input)
-            xrec = rearrange(xrec, "b c t h w -> (b t) c h w")
+            xrec = rearrange(xrec.clamp(-1, 1), "b c t h w -> (b t) c h w")
             outputs.append(xrec)
 
         toc = time.time()

@@ -39,8 +39,10 @@ class MultiVideoDataset(VidTokValDataset):
         meta_path=None,
         input_height=256,
         input_width=256,
-        num_frames_per_batch=17,
         sample_fps=30,
+        chunk_size=16,
+        is_causal=True,
+        read_long_video=False
     ):
         super().__init__(
             data_dir=data_dir,
@@ -48,11 +50,14 @@ class MultiVideoDataset(VidTokValDataset):
             video_params={
                 "input_height": input_height,
                 "input_width": input_width,
-                "sample_num_frames": num_frames_per_batch,
+                "sample_num_frames": chunk_size + 1 if is_causal else chunk_size,
                 "sample_fps": sample_fps,
             },
             pre_load_frames=True,
             last_frames_handle="repeat",
+            read_long_video=read_long_video,
+            chunk_size=chunk_size,
+            is_causal=is_causal,
         )
 
     def __getitem__(self, idx):
@@ -85,12 +90,6 @@ def main():
         help="path to checkpoint of model",
     )
     parser.add_argument(
-        "--input_video_path",
-        type=str,
-        default="assets/example.mp4",
-        help="path to the input video",
-    )
-    parser.add_argument(
         "--data_dir",
         type=str,
         default="./",
@@ -115,16 +114,20 @@ def main():
         help="width of the input video",
     )
     parser.add_argument(
-        "--num_frames_per_batch",
-        type=int,
-        default=17,
-        help="number of frames per batch",
-    )
-    parser.add_argument(
         "--sample_fps",
         type=int,
         default=30,
         help="sample fps",
+    )
+    parser.add_argument(
+        "--chunk_size",
+        type=int,
+        default=16,
+        help="the size of a chunk - we split a long video into several chunks",
+    )
+    parser.add_argument(
+        "--read_long_video",
+        action='store_true'
     )
 
     args = parser.parse_args()
@@ -136,14 +139,25 @@ def main():
 
     model = load_model_from_config(args.config, args.ckpt)
     model.to(device).eval()
+    assert args.chunk_size % model.encoder.time_downsample_factor == 0
+    
+    if args.read_long_video:
+        assert hasattr(model, 'use_tiling'), "Tiling inference is needed to conduct long video reconstruction."
+        print(f"Using tiling inference to save memory usage...")
+        model.use_tiling = True
+        model.t_chunk_enc = args.chunk_size
+        model.t_chunk_dec = model.t_chunk_enc // model.encoder.time_downsample_factor
+        model.use_overlap = True
 
     dataset = MultiVideoDataset(
-        data_dir=args.data_dir,
+        data_dir=args.data_dir, 
         meta_path=args.meta_path,
-        input_height=args.input_height,
-        input_width=args.input_width,
-        num_frames_per_batch=args.num_frames_per_batch,
-        sample_fps=args.sample_fps
+        input_height=args.input_height, 
+        input_width=args.input_width, 
+        sample_fps=args.sample_fps,
+        chunk_size=args.chunk_size, 
+        is_causal=model.is_causal,
+        read_long_video=args.read_long_video
     )
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
 
@@ -165,14 +179,11 @@ def main():
                 input = rearrange(input, "b c t h w -> (b t) c h w")
                 assert output.dim() == 5
                 output = rearrange(output, "b c t h w -> (b t) c h w")
-
-            psnr = compute_psnr(input, output)
-            ssim = compute_ssim(input, output)
-            lpips = perceptual_loss(input * 2 - 1, output * 2 - 1).mean()
-
-            psnrs.append(psnr.item())
-            ssims.append(ssim.item())
-            lpipss.append(lpips.item())
+            
+            for inp, out in zip(torch.split(input, 16), torch.split(output, 16)):
+                psnrs += [compute_psnr(inp, out).item()] * inp.shape[0]
+                ssims += [compute_ssim(inp, out).item()] * inp.shape[0]
+                lpipss += [perceptual_loss(inp * 2 - 1, out * 2 - 1).mean().item()] * inp.shape[0]
 
         toc = time.time()
         print0(

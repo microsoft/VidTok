@@ -7,6 +7,7 @@ model:
     # ckpt_path: checkpoints/vidtok_fsq_causal_488_32768.ckpt  # train from existing checkpoint
     ignore_keys: []
     # ema_decay: 0.999
+    is_causal: True
 
     encoder_config:
       target: vidtok.modules.model_3dcausal.EncoderCausal3DPadding
