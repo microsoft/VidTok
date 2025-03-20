@@ -338,6 +338,7 @@ class Encoder3D(nn.Module):
         self.time_downsample_factor = ignore_kwargs.get("time_downsample_factor", 4)
         self.tempo_ds = [self.num_resolutions - 2, self.num_resolutions - 3]
         self.norm_type = norm_type
+        self.is_causal = False
 
         # downsampling
         make_conv_cls = self._make_conv()

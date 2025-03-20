@@ -134,7 +134,7 @@ class AutoencodingEngine(AbstractAutoencoder):
 
         self.t_chunk_dec = self.t_chunk_enc // self.encoder.time_downsample_factor
         self.use_overlap = False
-        self.is_causal = True
+        self.is_causal = self.encoder.is_causal
 
         if self.use_ema:
             self.model_ema = LitEma(self, decay=self.ema_decay)

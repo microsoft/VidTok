@@ -115,7 +115,6 @@ class AutoencodingEngine(AbstractAutoencoder):
         ckpt_path = kwargs.pop("ckpt_path", None)
         ignore_keys = kwargs.pop("ignore_keys", ())
         verbose = kwargs.pop("verbose", True)
-        self.is_causal = kwargs.pop("is_causal", True)
         super().__init__(*args, **kwargs)
 
         compile = (
@@ -130,6 +129,7 @@ class AutoencodingEngine(AbstractAutoencoder):
         self.regularization = instantiate_from_config(regularizer_config)
         self.optimizer_config = default(optimizer_config, {"target": "torch.optim.Adam"})
         self.lr_g_factor = lr_g_factor
+        self.is_causal = self.encoder.is_causal
 
         if self.use_ema:
             self.model_ema = LitEma(self, decay=self.ema_decay)

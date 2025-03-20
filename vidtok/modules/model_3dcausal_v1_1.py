@@ -596,7 +596,8 @@ class EncoderCausal3D(nn.Module):
         self.in_channels = in_channels
         self.norm_type = norm_type
         self.fix_encoder = ignore_kwargs.get("fix_encoder", False)
-
+        self.is_causal = True
+        
         make_conv_cls = self._make_conv()
         make_attn_cls = self._make_attn()
         make_resblock_cls = self._make_resblock()

@@ -7,7 +7,6 @@ model:
     # ckpt_path: checkpoints/vidtok_kl_noncausal_41616_4chn.ckpt  # train from existing checkpoint
     ignore_keys: []
     # ema_decay: 0.999
-    is_causal: False
 
     encoder_config:
       target: vidtok.modules.model_3dnoncausal.Encoder3D
