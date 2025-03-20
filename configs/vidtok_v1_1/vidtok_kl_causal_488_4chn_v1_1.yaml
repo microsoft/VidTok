@@ -1,15 +1,16 @@
 model:
   base_learning_rate: 1e-5
-  target: vidtok.models.autoencoder.AutoencodingEngine
+  target: vidtok.models.autoencoder_v1_1.AutoencodingEngine
   params:
     monitor: val/rec_loss
     mode: min
-    # ckpt_path: checkpoints/vidtok_kl_noncausal_488_4chn.ckpt  # train from existing checkpoint
+    # ckpt_path: checkpoints/vidtok_v1_1/vidtok_kl_causal_488_4chn_v1_1.ckpt  # train from existing checkpoint
     ignore_keys: []
     # ema_decay: 0.999
+    use_tiling: False
 
     encoder_config:
-      target: vidtok.modules.model_3dnoncausal.Encoder3D
+      target: vidtok.modules.model_3dcausal_v1_1.EncoderCausal3DPadding
       params:
         double_z: true
         z_channels: 4
@@ -21,12 +22,14 @@ model:
         num_res_blocks: 2
         dropout: 0.0
         use_checkpoint: false
+        init_pad_mode: replicate
         norm_type: layernorm  # layernorm, groupnorm
-        fix_encoder: false
-        fix_decoder: false
+        interpolation_mode: trilinear  # nearest, trilinear
+        fix_encoder: false  # if True, fix it without updating params
+        fix_decoder: false  # if True, fix it without updating params
 
     decoder_config:
-      target: vidtok.modules.model_3dnoncausal.Decoder3D
+      target: vidtok.modules.model_3dcausal_v1_1.DecoderCausal3DPadding
       params: ${model.params.encoder_config.params}
 
     regularizer_config:
@@ -48,7 +51,7 @@ model:
 data:
   target: vidtok.data.datamodule.DataModuleFromConfig
   params:
-    batch_size: 2
+    batch_size: 1
     num_workers: 12
 
     train:
@@ -59,7 +62,7 @@ data:
         video_params:
           input_height: INPUT_HEIGHT_1
           input_width: INPUT_WIDTH_1
-          sample_num_frames: 16
+          sample_num_frames: 33
           sample_fps: 3
 
     validation:
@@ -70,7 +73,7 @@ data:
         video_params: 
           input_height: INPUT_HEIGHT_2
           input_width: INPUT_WIDTH_2
-          sample_num_frames: 16
+          sample_num_frames: 33
           sample_fps: 8
         start_index: 0
 
@@ -97,7 +100,7 @@ lightning:
         log_first_step: false
         log_before_first_step: false
         log_images_kwargs:
-          n_rows: 16
+          n_rows: 17
 
   trainer:
     precision: bf16-mixed

@@ -137,7 +137,10 @@ class VidTokValDataset(Dataset):
         pre_load_frames: bool = True,
         is_strict_loading: bool = True,
         last_frames_handle: str = "repeat",  # 'repeat', 'drop'
-        skip_missing_files: bool = False
+        skip_missing_files: bool = False,
+        read_long_video: bool = False,
+        chunk_size: int = 16,
+        is_causal: bool = True,
     ):
         super().__init__()
 
@@ -152,6 +155,9 @@ class VidTokValDataset(Dataset):
         )
 
         self.video_params = video_params
+        self.read_long_video = read_long_video
+        self.chunk_size = chunk_size
+        self.is_causal = is_causal
 
         self.is_strict_loading = is_strict_loading
         self.last_frames_handle = last_frames_handle
@@ -210,23 +216,39 @@ class VidTokValDataset(Dataset):
                 fps = video_reader.get_avg_fps()  # float
                 interval = round(fps / self.video_params["sample_fps"])
                 frame_ids = list(range(0, total_frames, interval))
-                for x in range(0, len(frame_ids), self.video_params["sample_num_frames"]):
-                    num_frames_ids = frame_ids[x : x + self.video_params["sample_num_frames"]]
-                    if len(num_frames_ids) < self.video_params["sample_num_frames"]:
-                        if self.last_frames_handle == "repeat":
-                            num_frames_ids += [num_frames_ids[-1]] * (
-                                self.video_params["sample_num_frames"] - len(num_frames_ids)
-                            )
-                        elif self.last_frames_handle == "drop":
-                            continue
-                        else:
-                            raise ValueError(f"Invalid last_frames_handle: {self.last_frames_handle}")
+                
+                if self.read_long_video:
+                    video_length = len(frame_ids)
+                    if self.is_causal and video_length > self.chunk_size:
+                        num_frames_ids = frame_ids[:self.chunk_size * ((video_length - 1) // self.chunk_size) + 1]
+                    elif not self.is_causal and video_length >= self.chunk_size:
+                        num_frames_ids = frame_ids[:self.chunk_size * (video_length // self.chunk_size)]
+                    else:
+                        continue
                     self.frames_batch.append(
                         {
                             "video_fp": video_fp,
                             "num_frames_ids": num_frames_ids,
                         }
                     )
+                else:
+                    for x in range(0, len(frame_ids), self.video_params["sample_num_frames"]):
+                        num_frames_ids = frame_ids[x : x + self.video_params["sample_num_frames"]]
+                        if len(num_frames_ids) < self.video_params["sample_num_frames"]:
+                            if self.last_frames_handle == "repeat":
+                                num_frames_ids += [num_frames_ids[-1]] * (
+                                    self.video_params["sample_num_frames"] - len(num_frames_ids)
+                                )
+                            elif self.last_frames_handle == "drop":
+                                continue
+                            else:
+                                raise ValueError(f"Invalid last_frames_handle: {self.last_frames_handle}")
+                        self.frames_batch.append(
+                            {
+                                "video_fp": video_fp,
+                                "num_frames_ids": num_frames_ids,
+                            }
+                        )
         print0(
             f"[bold yellow]\[vidtok.data.vidtok][VidTokValDataset][/bold yellow] Loaded all frames index from {len(self.metadata)} videos."
         )
@@ -293,14 +315,15 @@ class VidTokValDataset(Dataset):
         if self.transforms is not None:
             imgs = self.transforms(imgs)
 
-        if imgs.shape[0] < self.video_params["sample_num_frames"]:
-            print0(
-                f"[bold yellow]\[vidtok.data.vidtok][VidTokValDataset][/bold yellow] Warning: video {video_fp} has less frames {imgs.shape[0]} than sample_num_frames {self.video_params['sample_num_frames']}."
-            )
-            imgs = torch.cat(
-                [imgs, imgs[-1].unsqueeze(0).repeat(self.video_params["sample_num_frames"] - imgs.shape[0], 1, 1, 1)],
-                dim=0,
-            )
+        if not self.read_long_video:
+            if imgs.shape[0] < self.video_params["sample_num_frames"]:
+                print0(
+                    f"[bold yellow]\[vidtok.data.vidtok][VidTokValDataset][/bold yellow] Warning: video {video_fp} has less frames {imgs.shape[0]} than sample_num_frames {self.video_params['sample_num_frames']}."
+                )
+                imgs = torch.cat(
+                    [imgs, imgs[-1].unsqueeze(0).repeat(self.video_params["sample_num_frames"] - imgs.shape[0], 1, 1, 1)],
+                    dim=0,
+                )
 
         imgs = imgs.permute(1, 0, 2, 3)  # (C, T, H, W)
 

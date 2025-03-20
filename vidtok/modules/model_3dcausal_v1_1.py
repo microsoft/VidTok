@@ -149,13 +149,32 @@ class CausalConv1d(nn.Module):
         stride = kwargs.pop("stride", 1)
         self.pad_mode = pad_mode
         self.time_pad = dilation * (kernel_size - 1) + (1 - stride)
-        self.time_causal_padding = (self.time_pad, 0)
 
         self.conv = nn.Conv1d(chan_in, chan_out, kernel_size, stride=stride, dilation=dilation, **kwargs)
 
+        self.is_first_chunk = True
+        self.causal_cache = None
+        self.cache_offset = 0
+
     def forward(self, x):
-        pad_mode = self.pad_mode if self.time_pad < x.shape[2] else "constant"
-        x = F.pad(x, self.time_causal_padding, mode=pad_mode)
+        if self.is_first_chunk:
+            first_frame_pad = x[:, :, :1].repeat(
+                (1, 1, self.time_pad)
+            )
+        else:
+            first_frame_pad = self.causal_cache
+            if self.time_pad != 0:
+                first_frame_pad = first_frame_pad[:, :, -self.time_pad:]
+            else:
+                first_frame_pad = first_frame_pad[:, :, 0:0]    
+
+        x = torch.concatenate((first_frame_pad, x), dim=2)
+
+        if self.cache_offset == 0:
+            self.causal_cache = x.clone()
+        else:
+            self.causal_cache = x[:,:,:-self.cache_offset].clone()
+
         return self.conv(x)
 
 
@@ -179,21 +198,41 @@ class CausalConv3d(nn.Module):
         width_pad = dilation[2] * (height_kernel_size - 1) + (1 - stride[2])
 
         self.time_pad = time_pad
-        self.time_causal_padding = (
+        self.spatial_padding = (
             width_pad // 2,
             width_pad - width_pad // 2,
             height_pad // 2,
             height_pad - height_pad // 2,
-            time_pad,
+            0,
             0,
         )
 
         self.conv = nn.Conv3d(chan_in, chan_out, kernel_size, stride=stride, dilation=dilation, **kwargs)
 
-    def forward(self, x):
-        pad_mode = self.pad_mode if self.time_pad < x.shape[2] else "constant"
+        self.is_first_chunk = True
+        self.causal_cache = None
+        self.cache_offset = 0
 
-        x = F.pad(x, self.time_causal_padding, mode=pad_mode)
+    def forward(self, x):
+        if self.is_first_chunk:
+            first_frame_pad = x[:, :, :1, :, :].repeat(
+                (1, 1, self.time_pad, 1, 1)
+            )
+        else:
+            first_frame_pad = self.causal_cache
+            if self.time_pad != 0:
+                first_frame_pad = first_frame_pad[:, :, -self.time_pad:]
+            else:
+                first_frame_pad = first_frame_pad[:, :, 0:0]
+
+        x = torch.concatenate((first_frame_pad, x), dim=2)
+
+        if self.cache_offset == 0:
+            self.causal_cache = x.clone()
+        else:
+            self.causal_cache = x[:,:,:-self.cache_offset].clone()
+
+        x = F.pad(x, self.spatial_padding, mode=self.pad_mode)
         return self.conv(x)
 
 
@@ -244,10 +283,21 @@ class TimeDownsampleResCausal2x(nn.Module):
         # https://github.com/PKU-YuanGroup/Open-Sora-Plan/blob/main/opensora/models/causalvideovae/model/modules/updownsample.py
         self.mix_factor = torch.nn.Parameter(torch.Tensor([mix_factor]))
 
+        self.is_first_chunk = True
+        self.causal_cache = None
+
     def forward(self, x):
         alpha = torch.sigmoid(self.mix_factor)
         pad = (0, 0, 0, 0, 1, 0)
-        x1 = self.avg_pool(torch.nn.functional.pad(x, pad, mode="constant", value=0))
+
+        if self.is_first_chunk:
+            x_pad = torch.nn.functional.pad(x, pad, mode="replicate")
+        else:
+            x_pad = torch.concatenate((self.causal_cache, x), dim=2)
+
+        self.causal_cache = x_pad[:,:,-1:].clone()
+
+        x1 = self.avg_pool(x_pad)
         x2 = self.conv(x)
         return alpha * x1 + (1 - alpha) * x2
 
@@ -258,17 +308,37 @@ class TimeUpsampleResCausal2x(nn.Module):
         in_channels,
         out_channels,
         mix_factor: float = 2.0,
+        interpolation_mode='nearest',
+        num_temp_upsample=1
     ):
         super().__init__()
         self.conv = CausalConv3d(in_channels, out_channels, 3)
         # https://github.com/PKU-YuanGroup/Open-Sora-Plan/blob/main/opensora/models/causalvideovae/model/modules/updownsample.py
         self.mix_factor = torch.nn.Parameter(torch.Tensor([mix_factor]))
 
+        self.interpolation_mode = interpolation_mode
+        self.num_temp_upsample = num_temp_upsample
+        self.enable_cached = (self.interpolation_mode == 'trilinear')
+        self.is_first_chunk = True
+        self.causal_cache = None
+
     def forward(self, x):
         alpha = torch.sigmoid(self.mix_factor)
-        x = torch.nn.functional.interpolate(x.to(torch.float32), scale_factor=[2.0, 1.0, 1.0], mode="nearest").to(
-            x.dtype
-        )
+        if not self.enable_cached:
+            x = F.interpolate(x.to(torch.float32), scale_factor=[2.0, 1.0, 1.0], mode=self.interpolation_mode).to(x.dtype)
+        elif not self.is_first_chunk:
+            x = torch.cat([self.causal_cache, x], dim=2)
+            self.causal_cache = x[:, :, -2*self.num_temp_upsample:-self.num_temp_upsample].clone()
+            x = F.interpolate(x.to(torch.float32), scale_factor=[2.0, 1.0, 1.0], mode=self.interpolation_mode).to(x.dtype)
+            x = x[:, :, 2*self.num_temp_upsample:]
+        else:
+            self.causal_cache = x[:, :, -self.num_temp_upsample:].clone()
+            x, _x = x[:, :, :self.num_temp_upsample], x[:, :, self.num_temp_upsample:]
+            x = F.interpolate(x.to(torch.float32), scale_factor=[2.0, 1.0, 1.0], mode=self.interpolation_mode).to(x.dtype)
+            if _x.shape[-3] > 0:
+                _x = F.interpolate(_x.to(torch.float32), scale_factor=[2.0, 1.0, 1.0], mode=self.interpolation_mode).to(_x.dtype)
+                x = torch.concat([x, _x], dim=2)
+
         x_ = self.conv(x)
         return alpha * x + (1 - alpha) * x_
 
@@ -527,7 +597,7 @@ class EncoderCausal3D(nn.Module):
         self.norm_type = norm_type
         self.fix_encoder = ignore_kwargs.get("fix_encoder", False)
         self.is_causal = True
-
+        
         make_conv_cls = self._make_conv()
         make_attn_cls = self._make_attn()
         make_resblock_cls = self._make_resblock()
@@ -677,7 +747,7 @@ class EncoderCausal3DPadding(EncoderCausal3D):
 
         self.time_downsample_factor = ignore_kwargs.get("time_downsample_factor", 4)
         self.init_pad_mode = ignore_kwargs.get("init_pad_mode", "replicate")
-        self.time_padding = self.time_downsample_factor - 1
+
         if self.fix_encoder:
             for param in self.parameters():
                 param.requires_grad = False
@@ -685,7 +755,8 @@ class EncoderCausal3DPadding(EncoderCausal3D):
     def forward(self, x):
         video_len = x.shape[2]
         if video_len % self.time_downsample_factor != 0:
-            x = pad_at_dim(x, (self.time_padding, 0), dim=2, pad_mode=self.init_pad_mode, value=0.0)
+            time_padding = self.time_downsample_factor - video_len % self.time_downsample_factor
+            x = pad_at_dim(x, (time_padding, 0), dim=2, pad_mode=self.init_pad_mode, value=0.0)
         return super().forward(x)
 
 
@@ -720,6 +791,8 @@ class DecoderCausal3D(nn.Module):
         self.tanh_out = tanh_out
         self.norm_type = norm_type
         self.fix_decoder = ignorekwargs.get("fix_decoder", False)
+        self.interpolation_mode = ignorekwargs.get("interpolation_mode", 'nearest')
+        assert self.interpolation_mode in ['nearest', 'trilinear']
 
         in_ch_mult = (1,) + tuple(ch_mult)
         block_in = ch * ch_mult[self.num_resolutions - 1]
@@ -780,6 +853,7 @@ class DecoderCausal3D(nn.Module):
                 up.upsample = Upsample(block_in, resamp_with_conv)
             self.up.insert(0, up)
 
+        num_temp_upsample = 1
         self.up_temporal = nn.ModuleList()
         for i_level in reversed(range(self.num_resolutions)):
             block = nn.ModuleList()
@@ -803,7 +877,9 @@ class DecoderCausal3D(nn.Module):
             up_temporal.block = block
             up_temporal.attn = attn
             if i_level in self.tempo_us:
-                up_temporal.upsample = TimeUpsampleResCausal2x(block_in, block_in)
+                up_temporal.upsample = TimeUpsampleResCausal2x(block_in, block_in, interpolation_mode=self.interpolation_mode, num_temp_upsample=num_temp_upsample)
+                num_temp_upsample *= 2
+
             self.up_temporal.insert(0, up_temporal)
 
         # end
@@ -874,12 +950,10 @@ class DecoderCausal3DPadding(DecoderCausal3D):
     def __init__(self, *args, **ignore_kwargs):
         super().__init__(*args, **ignore_kwargs)
 
-        self.time_downsample_factor = ignore_kwargs.get("time_downsample_factor", 4)
-        self.time_padding = self.time_downsample_factor - 1
         if self.fix_decoder:
             for param in self.parameters():
                 param.requires_grad = False
 
     def forward(self, x):
         x = super().forward(x)
-        return x[:, :, self.time_padding :, :, :]
+        return x
