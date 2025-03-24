@@ -19,7 +19,7 @@ VidTok, trained on a large-scale video dataset, outperforms previous models acro
 https://github.com/user-attachments/assets/a3341037-130d-4a83-aba6-c3daeaf66932
 
 ## 🔥 News
-* December, 2024: 🚀 [VidTwin](https://github.com/microsoft/VidTok/tree/main/vidtwin) has been accepted by CVPR 2025, and the [checkpoint](https://huggingface.co/microsoft/vidtwin) was released!
+* March, 2025: 🚀 [VidTwin](https://github.com/microsoft/VidTok/tree/main/vidtwin) has been accepted by CVPR 2025, and the [checkpoint](https://huggingface.co/microsoft/vidtwin) was released!
 * March, 2025: 🚀 [VidTok v1.1](#-updates-in-vidtok-v11) was released! We fine-tuned all causal models on long videos to support tokenization and reconstruction of videos of arbitrary length with fine temporal smoothness. [Relevant checkpoints](https://huggingface.co/microsoft/VidTok/tree/main/checkpoints/vidtok_v1_1) are continuously updating.
 * December, 2024: 🚀 [VidTwin](https://github.com/microsoft/VidTok/tree/main/vidtwin) was released!
 * December, 2024: 🚀 [VidTok](https://github.com/microsoft/vidtok) was released!
