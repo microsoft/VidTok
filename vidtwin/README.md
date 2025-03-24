@@ -1,7 +1,7 @@
 
 
 <h1 align="center">
-<img src="../assets/gemini.png" alt="VidTwin" style="height: 2rem;"> VidTwin: Video VAE with Decoupled Structure and Dynamics
+<img src="../assets/gemini.png" alt="VidTwin" style="height: 2rem;"> VidTwin: Video VAE with Decoupled Structure and Dynamics (CVPR 2025)
 </h1>
 <h3 align="center">
   <a href="https://wangyuchi369.github.io/">Yuchi Wang</a> &nbsp; 
@@ -16,9 +16,9 @@
 
 <div align=center>
 
-[![arXiv](https://img.shields.io/badge/arXiv-Paper-red?logo=arxiv&logoColor=white)](https://arxiv.org/pdf/2412.17726) &ensp; [![GitHub](https://img.shields.io/badge/GitHub-Code-blue?logo=github&logoColor=white)](https://github.com/microsoft/VidTok) &ensp; [![Static Badge](https://img.shields.io/badge/Demo-Project_Page-yellow)](https://wangyuchi369.github.io/VidTwin/)
+[![arXiv](https://img.shields.io/badge/arXiv-Paper-red?logo=arxiv&logoColor=white)](https://arxiv.org/pdf/2412.17726) &ensp; [![HuggingFace](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow)](https://huggingface.co/microsoft/vidtwin) &ensp; [![Static Badge](https://img.shields.io/badge/Demo-Project_Page-yellow)](https://vidtwin.github.io/)
 
-<h3> 🔥 Check our <a href="https://wangyuchi369.github.io/VidTwin/">Demo Page</a> for enhanced visual experience.</h3>
+<h3> 🔥 Check our <a href="https://vidtwin.github.io/">Demo Page</a> for enhanced visual experience.</h3>
 
 <img src='../assets/vidtwin_demo.png' width="650">
 <br>
@@ -152,8 +152,7 @@ python main.py -b CONFIG --logdir LOGDIR --wandb --wandb_entity ENTITY --wandb_p
 
 
 ### Easy Usage
-We provide the following example for a quick usage of our models. 
-Just provide the path to the configuration file `cfg_path` and checkpoint file `ckpt_path`.
+We provide the following example for a quick usage of our models. After downloaded the checkpoint from our [Huggingface page](https://huggingface.co/microsoft/vidtwin), just provide the path of the configuration file `cfg_path` and checkpoint file `ckpt_path` to the script.
 ```python
 import torch
 from scripts.inference_evaluate import load_model_from_config
