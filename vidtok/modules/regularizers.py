@@ -231,7 +231,7 @@ class FSQRegularizer(AbstractRegularizer):
 
             if self.entropy_loss_weight > 0 or self.commitment_loss_weight > 0:
                 # the same as euclidean distance up to a constant
-                distance = -2 * torch.einsum("... i d, j d -> ... i j", original_input, self.implicit_codebook)
+                distance = -2 * torch.einsum("... i d, j d -> ... i j", original_input, self.implicit_codebook.float())
                 prob = (-distance * inv_temperature).softmax(dim=-1)
                 per_sample_probs = rearrange(prob, "b n ... -> (b n) ...")
                 per_sample_entropy = entropy(per_sample_probs).mean()
