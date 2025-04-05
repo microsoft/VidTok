@@ -305,11 +305,19 @@ class AutoencodingEngine(AbstractAutoencoder):
         result = []
 
         if self.use_overlap:
-            assert self.encoder.time_downsample_factor == 4, "Only support 4x temporal downsampling now."
-            self._set_cache_offset([self.decoder], 1)
-            self._set_cache_offset([self.decoder.up_temporal[1], self.decoder.up_temporal[2].upsample], 2)
-            self._set_cache_offset([self.decoder.up_temporal[0], self.decoder.up_temporal[1].upsample, self.decoder.conv_out], 4)
-            # TODO: support more settings
+            assert self.encoder.time_downsample_factor in [2, 4, 8], "Only support 2x, 4x or 8x temporal downsampling now."
+            if self.encoder.time_downsample_factor == 4:
+                self._set_cache_offset([self.decoder], 1)
+                self._set_cache_offset([self.decoder.up_temporal[2].upsample, self.decoder.up_temporal[1]], 2)
+                self._set_cache_offset([self.decoder.up_temporal[1].upsample, self.decoder.up_temporal[0], self.decoder.conv_out], 4)
+            elif self.encoder.time_downsample_factor == 2:
+                self._set_cache_offset([self.decoder], 1)
+                self._set_cache_offset([self.decoder.up_temporal[2].upsample, self.decoder.up_temporal[1], self.decoder.up_temporal[0], self.decoder.conv_out], 2)
+            else:
+                self._set_cache_offset([self.decoder], 1)
+                self._set_cache_offset([self.decoder.up_temporal[3].upsample, self.decoder.up_temporal[2]], 2)
+                self._set_cache_offset([self.decoder.up_temporal[2].upsample, self.decoder.up_temporal[1]], 4)
+                self._set_cache_offset([self.decoder.up_temporal[1].upsample, self.decoder.up_temporal[0], self.decoder.conv_out], 8)
 
         for idx, (start, end) in enumerate(start_end):
             self._set_first_chunk(idx == 0)
