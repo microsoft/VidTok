@@ -195,7 +195,7 @@ class CausalConv3d(nn.Module):
         self.pad_mode = pad_mode
         time_pad = dilation[0] * (time_kernel_size - 1) + (1 - stride[0])
         height_pad = dilation[1] * (height_kernel_size - 1) + (1 - stride[1])
-        width_pad = dilation[2] * (height_kernel_size - 1) + (1 - stride[2])
+        width_pad = dilation[2] * (width_kernel_size - 1) + (1 - stride[2])
 
         self.time_pad = time_pad
         self.spatial_padding = (

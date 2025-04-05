@@ -72,6 +72,10 @@ Follow this [training guidance](#fine-tune-on-custom-data) to fine-tune on your 
 | Model  | Regularizer | Causal | VCR  | PSNR  | SSIM  | LPIPS  | FVD |
 |------|------|------|------|------|------|------|------|
 | [vidtok_kl_causal_488_16chn_v1_1](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_v1_1/vidtok_kl_causal_488_16chn_v1_1.ckpt) | KL-16chn | ✔️ | 4x8x8 | 35.13 | 0.941 | 0.049 | 87.4 | 
+| [vidtok_kl_causal_41616_16chn_v1_1](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_v1_1/vidtok_kl_causal_41616_16chn_v1_1.ckpt) | KL-16chn | ✔️ | 4x16x16 | 29.61 | 0.854 | 0.113 | 162.7 | 
+| [vidtok_kl_causal_288_8chn_v1_1](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_v1_1/vidtok_kl_causal_288_8chn_v1_1.ckpt) | KL-8chn | ✔️ | 2x8x8 | 34.59 | 0.935 | 0.051 | 78.2 | 
+| [vidtok_fsq_causal_488_32768_v1_1](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_v1_1/vidtok_fsq_causal_488_32768_v1_1.ckpt) | FSQ-32,768 | ✔️ | 4x8x8 | 29.39 | 0.856 | 0.114 | 168.5 | 
+| [vidtok_fsq_causal_888_32768_v1_1](https://huggingface.co/microsoft/VidTok/blob/main/checkpoints/vidtok_v1_1/vidtok_fsq_causal_888_32768_v1_1.ckpt) | FSQ-32,768 | ✔️ | 8x8x8 | 27.95 | 0.817 | 0.142 | 293.2 | 
 - This is the evaluation result of long video reconstruction conducted on each complete video in [MCL_JCL](https://mcl.usc.edu/mcl-jcv-dataset/) dataset, with a sample fps of 30 and a resolution of `256x256`.
 
 
